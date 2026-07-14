@@ -219,6 +219,7 @@ class WidgetLayoutTest {
             val wideTexts = wide.textViews().map { it.text.toString() }
             val squareTexts = square.textViews().map { it.text.toString() }
 
+            assertTrue("wide name at $fontScale: $wideTexts", content.name in wideTexts)
             assertTrue("wide days at $fontScale: $wideTexts", "23天" in wideTexts)
             if (!(Build.VERSION.SDK_INT <= Build.VERSION_CODES.O && fontScale >= 2f)) {
                 assertTrue("wide date at $fontScale: $wideTexts", wideTexts.any { "8/6" in it })
