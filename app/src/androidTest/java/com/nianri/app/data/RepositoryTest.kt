@@ -8,9 +8,12 @@ import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.ImportantDay
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -67,6 +70,32 @@ class RepositoryTest {
     }
 
     @Test
+    fun replacingPinnedDayNeverEmitsAnIntermediateUnpinnedState() = runBlocking {
+        days.save(day(name = "第一个", isPinned = true))
+        val initialEmission = CompletableDeferred<Unit>()
+        val replacementEmission = CompletableDeferred<Unit>()
+        val emissions = mutableListOf<List<ImportantDay>>()
+        val observation = launch {
+            days.observeAll().collect { emission ->
+                emissions += emission
+                initialEmission.complete(Unit)
+                if (emission.any { it.name == "第二个" }) {
+                    replacementEmission.complete(Unit)
+                }
+            }
+        }
+        initialEmission.await()
+
+        days.save(day(name = "第二个", isPinned = true))
+        replacementEmission.await()
+        observation.cancelAndJoin()
+
+        assertTrue(emissions.size >= 2)
+        assertEquals(1, emissions.first().count { it.isPinned })
+        assertTrue(emissions.drop(1).all { emission -> emission.count { it.isPinned } == 1 })
+    }
+
+    @Test
     fun observationEmitsAfterSavedDataChanges() = runBlocking {
         val initialEmission = CompletableDeferred<Unit>()
         val emissions = async {
@@ -118,9 +147,23 @@ class RepositoryTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
+    fun saveRejectsBlankName() {
+        runBlocking {
+            days.save(day(name = " "))
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun saveRejectsInvalidMonth() {
+        runBlocking {
+            days.save(day(name = "有效名称", month = 13))
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
     fun saveRejectsInvalidDay() {
         runBlocking {
-            days.save(day(name = " ", month = 13, day = 0))
+            days.save(day(name = "有效名称", month = 4, day = 31))
         }
     }
 
