@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="164"
+    android:viewportHeight="164">
+    <path
+        android:fillColor="@color/icon_primary_purple"
+        android:pathData="M82,6A76,76 0,1 1,82 158A76,76 0,1 1,82 6Z" />
+    <path
+        android:fillColor="@color/icon_calendar_paper"
+        android:pathData="M59,37H105A21,21 0,0 1,126 58V110A21,21 0,0 1,105 131H59A21,21 0,0 1,38 110V58A21,21 0,0 1,59 37Z" />
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M38,65H126"
+        android:strokeColor="@color/icon_calendar_divider"
+        android:strokeWidth="7" />
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M60,30V50M104,30V50"
+        android:strokeColor="@color/icon_sun"
+        android:strokeLineCap="round"
+        android:strokeWidth="10" />
+    <path
+        android:fillColor="@color/icon_sun"
+        android:pathData="M65,78A15,15 0,1 1,65 108A15,15 0,1 1,65 78Z" />
+    <path
+        android:fillColor="@color/icon_primary_purple"
+        android:pathData="M111,104A17,17 0,1 1,98 76A20,20 0,0 0,111 104Z" />
+</vector>
