@@ -81,6 +81,7 @@ internal fun NianriWidgetSurface(
 private fun WideContent(context: Context, model: WidgetModel.Content, modifier: GlanceModifier) {
     val text = WidgetTextContract.wide(model)
     val detailAction = actionStartActivity(WidgetActionIntents.detail(context, model.id))
+    val toggleAction = actionRunCallback<ToggleWidgetCalendarAction>()
     val fontScale = context.resources.configuration.fontScale.coerceAtLeast(1f)
     val hideSecondRow = Build.VERSION.SDK_INT <= Build.VERSION_CODES.O && fontScale >= 2f
     val basisText = when {
@@ -90,12 +91,12 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
     }
     Column(
         modifier = modifier
-            .clickable(detailAction)
             .padding(horizontal = 7.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = (if (hideSecondRow) GlanceModifier.fillMaxSize() else GlanceModifier.fillMaxWidth())
+                .clickable(detailAction),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -113,7 +114,10 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
         }
         if (!hideSecondRow) {
             Row(
-                modifier = GlanceModifier.fillMaxWidth(),
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .clickable(toggleAction)
+                    .height(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (basisText.isNotEmpty()) {
@@ -126,7 +130,6 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
                 Spacer(GlanceModifier.defaultWeight())
                 Text(
                     text.rows[1].trailing,
-                    modifier = GlanceModifier.clickable(actionRunCallback<ToggleWidgetCalendarAction>()),
                     style = TextStyle(
                         PrimaryText,
                         fontSize = cappedSp(8f, fontScale, 1f),
@@ -143,32 +146,38 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
 private fun SquareContent(context: Context, model: WidgetModel.Content, modifier: GlanceModifier) {
     val text = WidgetTextContract.square(model)
     val detailAction = actionStartActivity(WidgetActionIntents.detail(context, model.id))
+    val toggleAction = actionRunCallback<ToggleWidgetCalendarAction>()
     val fontScale = context.resources.configuration.fontScale.coerceAtLeast(1f)
     Column(
-        modifier = modifier.clickable(detailAction).padding(10.dp),
+        modifier = modifier.padding(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
         Text(
             text.name,
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = GlanceModifier.fillMaxWidth().clickable(detailAction),
             style = TextStyle(PrimaryText, fontSize = cappedSp(13f, fontScale, 1.15f), fontWeight = FontWeight.Medium),
             maxLines = 1,
         )
         Text(
             text.basis,
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = GlanceModifier.fillMaxWidth().clickable(detailAction),
             style = TextStyle(SecondaryText, fontSize = cappedSp(9f, fontScale, 1.15f)),
             maxLines = 1,
         )
-        Spacer(GlanceModifier.height(2.dp))
+        Spacer(GlanceModifier.fillMaxWidth().height(2.dp).clickable(detailAction))
         Text(
             text.days,
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = GlanceModifier.fillMaxWidth().clickable(detailAction),
             style = TextStyle(CountdownText, fontSize = cappedSp(28f, fontScale, 1.15f), fontWeight = FontWeight.Bold),
             maxLines = 1,
         )
-        Spacer(GlanceModifier.defaultWeight())
-        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(GlanceModifier.fillMaxWidth().defaultWeight().clickable(detailAction))
+        Row(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .clickable(toggleAction),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             if (fontScale == 1f) {
                 Text(
                     text.dateLabel,
@@ -179,7 +188,6 @@ private fun SquareContent(context: Context, model: WidgetModel.Content, modifier
             Spacer(GlanceModifier.defaultWeight())
             Text(
                 text.dateControl,
-                modifier = GlanceModifier.clickable(actionRunCallback<ToggleWidgetCalendarAction>()),
                 style = TextStyle(
                     PrimaryText,
                     fontSize = cappedSp(9f, fontScale, 1.15f),

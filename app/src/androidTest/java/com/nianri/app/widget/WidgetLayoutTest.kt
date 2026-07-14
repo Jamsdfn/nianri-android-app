@@ -264,20 +264,27 @@ class WidgetLayoutTest {
     }
 
     @Test
-    fun fullCardBackgroundOpensDetailWhileDateRegionKeepsItsOwnClickTarget() = runBlocking {
+    fun primaryContentOpensDetailAndFullWidthDateRowOwnsToggle() = runBlocking {
         listOf(true to DpSize(110.dp, 40.dp), false to DpSize(110.dp, 110.dp)).forEach { (wide, size) ->
             val view = render(size, wide = wide, model = content)
             val fullBounds = Rect(0, 0, view.measuredWidth, view.measuredHeight)
-            val fullCardTarget = view.allViews().firstOrNull {
-                it.hasOnClickListeners() && it.boundsIn(view) == fullBounds
-            }
+            val primaryText = view.textViews().first { it.text.toString() == content.name }
             val dateText = view.textViews().first { "↻" in it.text.toString() }
+            val primaryTarget = primaryText.closestClickableAncestor()
             val dateTarget = dateText.closestClickableAncestor()
 
-            assertNotNull("${if (wide) "wide" else "square"} background lacks full-card click", fullCardTarget)
-            assertNotNull("date control lacks click target", dateTarget)
-            assertNotEquals("date callback must override the background detail action", fullCardTarget, dateTarget)
-            assertTrue("date target must be smaller than the whole card", dateTarget!!.boundsIn(view) != fullBounds)
+            assertNotNull("primary content lacks detail target", primaryTarget)
+            assertNotNull("date row lacks toggle target", dateTarget)
+            assertNotEquals("detail and toggle targets must be siblings", primaryTarget, dateTarget)
+            assertFalse(
+                "content widgets must not retain an overlapping full-card action",
+                view.allViews().any { it.hasOnClickListeners() && it.boundsIn(view) == fullBounds },
+            )
+            val horizontalInset = px(if (wide) 7 else 10)
+            assertTrue(
+                "date toggle must span the padded card width",
+                dateTarget!!.boundsIn(view).width() >= view.measuredWidth - horizontalInset * 2,
+            )
         }
     }
 
@@ -313,6 +320,9 @@ class WidgetLayoutTest {
         label: String = "",
     ) {
         val verticalSafetyPx = px(verticalSafetyDp)
+        val hierarchy = root.allViews().joinToString(prefix = "hierarchy=[", postfix = "]") {
+            "${it.javaClass.simpleName}{bounds=${it.boundsIn(root)},click=${it.hasOnClickListeners()}}"
+        }
         root.textViews().forEach {
             var left = it.left
             var top = it.top
@@ -336,7 +346,8 @@ class WidgetLayoutTest {
                     it.baseline + metrics.top >= 0,
                 )
                 assertTrue(
-                    "font bottom $label for ${it.text}: height=${it.height}, baseline=${it.baseline}, bottom=${metrics.bottom}",
+                    "font bottom $label for ${it.text}: height=${it.height}, baseline=${it.baseline}, " +
+                        "bottom=${metrics.bottom}; $hierarchy",
                     it.baseline + metrics.bottom <= it.height,
                 )
             }
