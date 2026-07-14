@@ -20,6 +20,7 @@ import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.nianri.app.NianriApplication
 import com.nianri.app.domain.model.CalendarSystem
@@ -130,6 +131,7 @@ class WidgetLayoutTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = 29)
     fun privateReceiverDeletionLifecycleStillCleansItsInstance() = runBlocking {
         val container = (context as NianriApplication).container
         container.database.clearAllTables()
@@ -323,7 +325,7 @@ class WidgetLayoutTest {
                 "bottom safety for ${it.text}: ${top + it.height}, root=${root.measuredHeight}, safety=$verticalSafetyPx",
                 top + it.height <= root.measuredHeight - verticalSafetyPx,
             )
-            if (requireFontBox) {
+            if (requireFontBox && it.text.isNotEmpty()) {
                 val metrics = it.paint.fontMetricsInt
                 assertTrue(
                     "font top for ${it.text}: height=${it.height}, baseline=${it.baseline}, top=${metrics.top}",

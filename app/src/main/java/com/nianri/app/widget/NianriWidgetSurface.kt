@@ -116,7 +116,7 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
             if (basisText.isNotEmpty()) {
                 Text(
                     basisText,
-                    style = TextStyle(SecondaryText, fontSize = cappedSp(8.5f, fontScale, 1f)),
+                    style = TextStyle(SecondaryText, fontSize = cappedSp(8f, fontScale, 1f)),
                     maxLines = 1,
                 )
             }
