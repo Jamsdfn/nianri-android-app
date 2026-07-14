@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -458,7 +459,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun homeContentAndFabRespectSafeDrawingInsets() {
+    fun homeContentRespectsSafeDrawingInsetsWithoutDuplicateFab() {
         composeRule.setContent {
             HomeScreen(
                 state = HomeUiState(showCalendarExplanation = false),
@@ -473,9 +474,9 @@ class HomeScreenTest {
 
         val root = composeRule.onNodeWithTag("home-root").getUnclippedBoundsInRoot()
         val title = composeRule.onNodeWithTag("home-title").getUnclippedBoundsInRoot()
-        val fab = composeRule.onNodeWithTag("home-fab").getUnclippedBoundsInRoot()
         assertTrue(title.top >= root.top + 40.dp)
-        assertTrue(fab.bottom <= root.bottom - 60.dp)
+        composeRule.onNodeWithTag("home-add").assertIsDisplayed()
+        assertEquals(0, composeRule.onAllNodesWithTag("home-fab").fetchSemanticsNodes().size)
     }
 
     private fun readyDay(

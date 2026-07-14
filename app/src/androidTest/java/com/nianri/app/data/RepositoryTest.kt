@@ -117,17 +117,24 @@ class RepositoryTest {
     }
 
     @Test
-    fun widgetPreferencePersistsByAppWidgetIdAndTogglesIndependently() = runBlocking {
+    fun widgetResolutionUsesDayDisplayAndToggleLinksEveryWidgetForThatDay() = runBlocking {
         val firstDayId = days.save(day(name = "纪念日"))
-        val secondDayId = days.save(day(name = "生日"))
-        widgets.select(41, firstDayId, CalendarSystem.SOLAR)
+        val secondDayId = days.save(day(name = "生日", appDisplay = CalendarSystem.LUNAR))
+        widgets.select(41, firstDayId, CalendarSystem.LUNAR)
+        widgets.select(43, firstDayId, CalendarSystem.SOLAR)
         widgets.select(42, secondDayId, CalendarSystem.LUNAR)
 
         assertEquals(
             WidgetResolution.Configured(days.get(firstDayId)!!, CalendarSystem.SOLAR),
             widgets.resolve(41),
         )
-        assertEquals(CalendarSystem.LUNAR, widgets.toggleDisplay(41))
+        val change = widgets.toggleLinkedDisplay(41)!!
+
+        assertEquals(CalendarSystem.LUNAR, change.display)
+        assertEquals(listOf(41, 43), change.appWidgetIds)
+        assertEquals(CalendarSystem.LUNAR, days.get(firstDayId)?.appDisplay)
+        assertEquals(CalendarSystem.LUNAR, database.widgetPreferenceDao().get(41)?.display)
+        assertEquals(CalendarSystem.LUNAR, database.widgetPreferenceDao().get(43)?.display)
         assertEquals(
             WidgetResolution.Configured(days.get(firstDayId)!!, CalendarSystem.LUNAR),
             widgets.resolve(41),
@@ -136,7 +143,25 @@ class RepositoryTest {
             WidgetResolution.Configured(days.get(secondDayId)!!, CalendarSystem.LUNAR),
             widgets.resolve(42),
         )
-        assertEquals(1, widgets.countReferences(firstDayId))
+        assertEquals(2, widgets.countReferences(firstDayId))
+    }
+
+    @Test
+    fun settingDisplayFromAppUpdatesOnlyWidgetsForThatDay() = runBlocking {
+        val firstDayId = days.save(day(name = "纪念日"))
+        val secondDayId = days.save(day(name = "生日"))
+        widgets.select(51, firstDayId, CalendarSystem.SOLAR)
+        widgets.select(52, firstDayId, CalendarSystem.SOLAR)
+        widgets.select(53, secondDayId, CalendarSystem.SOLAR)
+
+        val change = widgets.setLinkedDisplay(firstDayId, CalendarSystem.LUNAR)!!
+
+        assertEquals(listOf(51, 52), change.appWidgetIds)
+        assertEquals(CalendarSystem.LUNAR, days.get(firstDayId)?.appDisplay)
+        assertEquals(CalendarSystem.LUNAR, database.widgetPreferenceDao().get(51)?.display)
+        assertEquals(CalendarSystem.LUNAR, database.widgetPreferenceDao().get(52)?.display)
+        assertEquals(CalendarSystem.SOLAR, days.get(secondDayId)?.appDisplay)
+        assertEquals(CalendarSystem.SOLAR, database.widgetPreferenceDao().get(53)?.display)
     }
 
     @Test
@@ -161,7 +186,7 @@ class RepositoryTest {
 
         assertTrue(widgets.resolve(201) is WidgetResolution.Unconfigured)
         assertEquals(
-            WidgetResolution.Configured(days.get(dayId)!!, CalendarSystem.LUNAR),
+            WidgetResolution.Configured(days.get(dayId)!!, CalendarSystem.SOLAR),
             widgets.resolve(202),
         )
     }
@@ -185,7 +210,7 @@ class RepositoryTest {
 
         assertEquals(true, selected)
         assertEquals(
-            WidgetResolution.Configured(days.get(dayId)!!, CalendarSystem.LUNAR),
+            WidgetResolution.Configured(days.get(dayId)!!, CalendarSystem.SOLAR),
             widgets.resolve(212),
         )
     }
@@ -224,7 +249,7 @@ class RepositoryTest {
     }
 
     @Test
-    fun toggleControllerChangesAndUpdatesOnlyTheRequestedWidget() = runBlocking {
+    fun toggleControllerChangesAndUpdatesEveryWidgetForTheSameDay() = runBlocking {
         val dayId = days.save(day(name = "纪念日"))
         widgets.select(301, dayId, CalendarSystem.SOLAR)
         widgets.select(302, dayId, CalendarSystem.LUNAR)
@@ -235,7 +260,7 @@ class RepositoryTest {
 
         assertEquals(CalendarSystem.LUNAR, (widgets.resolve(301) as WidgetResolution.Configured).display)
         assertEquals(CalendarSystem.LUNAR, (widgets.resolve(302) as WidgetResolution.Configured).display)
-        assertEquals(listOf(301), updated)
+        assertEquals(listOf(301, 302), updated.sorted())
     }
 
     @Test

@@ -5,7 +5,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import com.nianri.app.data.WidgetRepository
-import com.nianri.app.data.WidgetResolution
 import com.nianri.app.domain.WidgetUpdater
 import com.nianri.app.domain.model.CalendarSystem
 import kotlinx.coroutines.CancellationException
@@ -128,9 +127,13 @@ class WidgetToggleController(
     private val widgets: WidgetRepository,
     private val updater: WidgetInstanceUpdater,
 ) {
+    suspend fun set(dayId: Long, display: CalendarSystem) {
+        val change = widgets.setLinkedDisplay(dayId, display) ?: return
+        updateWidgetInstances(change.appWidgetIds, updater::update)
+    }
+
     suspend fun toggle(appWidgetId: Int) {
-        if (widgets.resolve(appWidgetId) !is WidgetResolution.Configured) return
-        widgets.toggleDisplay(appWidgetId) ?: return
-        updater.update(appWidgetId)
+        val change = widgets.toggleLinkedDisplay(appWidgetId) ?: return
+        updateWidgetInstances(change.appWidgetIds, updater::update)
     }
 }

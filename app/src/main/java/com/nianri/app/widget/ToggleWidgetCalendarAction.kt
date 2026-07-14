@@ -15,6 +15,6 @@ class ToggleWidgetCalendarAction : ActionCallback {
     ) {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
         val container = (context.applicationContext as NianriApplication).container
-        WidgetToggleController(container.widgets, container.widgetInstanceUpdater).toggle(appWidgetId)
+        container.linkedDisplayController.toggle(appWidgetId)
     }
 }

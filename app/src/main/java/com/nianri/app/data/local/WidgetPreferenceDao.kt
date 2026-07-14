@@ -3,6 +3,7 @@ package com.nianri.app.data.local
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
+import com.nianri.app.domain.model.CalendarSystem
 
 @Dao
 interface WidgetPreferenceDao {
@@ -14,6 +15,12 @@ interface WidgetPreferenceDao {
 
     @Query("SELECT COUNT(*) FROM widget_preferences WHERE importantDayId = :dayId")
     suspend fun countForDay(dayId: Long): Int
+
+    @Query("SELECT appWidgetId FROM widget_preferences WHERE importantDayId = :dayId ORDER BY appWidgetId")
+    suspend fun idsForDay(dayId: Long): List<Int>
+
+    @Query("UPDATE widget_preferences SET display = :display WHERE importantDayId = :dayId")
+    suspend fun updateDisplayForDay(dayId: Long, display: CalendarSystem)
 
     @Query("SELECT COUNT(*) FROM widget_preferences")
     suspend fun countAll(): Int

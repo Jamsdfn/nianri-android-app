@@ -139,7 +139,7 @@ class HomeViewModel(
             require(modelClass.isAssignableFrom(HomeViewModel::class.java))
             return HomeViewModel(
                 cards = container.dayListProjector.observeAll(),
-                updateAppDisplay = container.importantDays::updateAppDisplay,
+                updateAppDisplay = container.linkedDisplayController::set,
                 converter = container.calendarConverter,
                 uiPreferences = uiPreferences,
             ) as T

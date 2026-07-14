@@ -17,9 +17,16 @@ sealed interface WidgetResolution {
     ) : WidgetResolution
 }
 
+data class LinkedDisplayChange(
+    val dayId: Long,
+    val display: CalendarSystem,
+    val appWidgetIds: List<Int>,
+)
+
 class WidgetRepository(private val database: NianriDatabase) {
     private val preferences = database.widgetPreferenceDao()
     private val days = ImportantDayRepository(database)
+    private val dayRecords = database.importantDayDao()
 
     suspend fun select(
         appWidgetId: Int,
@@ -39,20 +46,32 @@ class WidgetRepository(private val database: NianriDatabase) {
         true
     }
 
-    suspend fun toggleDisplay(appWidgetId: Int): CalendarSystem? {
-        val current = preferences.get(appWidgetId) ?: return null
-        val toggled = when (current.display) {
+    suspend fun setLinkedDisplay(
+        dayId: Long,
+        display: CalendarSystem,
+    ): LinkedDisplayChange? = database.withTransaction {
+        dayRecords.get(dayId) ?: return@withTransaction null
+        dayRecords.updateAppDisplay(dayId, display)
+        preferences.updateDisplayForDay(dayId, display)
+        LinkedDisplayChange(dayId, display, preferences.idsForDay(dayId))
+    }
+
+    suspend fun toggleLinkedDisplay(appWidgetId: Int): LinkedDisplayChange? = database.withTransaction {
+        val current = preferences.get(appWidgetId) ?: return@withTransaction null
+        val day = dayRecords.get(current.importantDayId) ?: return@withTransaction null
+        val toggled = when (day.appDisplay) {
             CalendarSystem.SOLAR -> CalendarSystem.LUNAR
             CalendarSystem.LUNAR -> CalendarSystem.SOLAR
         }
-        preferences.upsert(current.copy(display = toggled))
-        return toggled
+        dayRecords.updateAppDisplay(day.id, toggled)
+        preferences.updateDisplayForDay(day.id, toggled)
+        LinkedDisplayChange(day.id, toggled, preferences.idsForDay(day.id))
     }
 
     suspend fun resolve(appWidgetId: Int): WidgetResolution {
         val preference = preferences.get(appWidgetId) ?: return WidgetResolution.Unconfigured
         val day = days.get(preference.importantDayId) ?: return WidgetResolution.MissingDay
-        return WidgetResolution.Configured(day, preference.display)
+        return WidgetResolution.Configured(day, day.appDisplay)
     }
 
     suspend fun countReferences(dayId: Long): Int = preferences.countForDay(dayId)
