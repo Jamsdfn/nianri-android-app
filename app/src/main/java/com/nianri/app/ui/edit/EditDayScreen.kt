@@ -1,6 +1,7 @@
 package com.nianri.app.ui.edit
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -21,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -35,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nianri.app.domain.DayCardModel
 import com.nianri.app.domain.model.CalendarSystem
@@ -42,7 +47,9 @@ import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.domain.model.Occurrence
 import com.nianri.app.ui.theme.NianriTheme
+import com.nianri.app.ui.countdownCopy
 import java.time.LocalDate
+import java.time.Month
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,6 +106,7 @@ fun EditDayScreen(
                 selected = state.basis,
                 solarLabel = "新历基准",
                 lunarLabel = "农历基准",
+                groupTag = "basis-options",
                 onSelected = onBasisChange,
             )
             OutlinedButton(onClick = { showDateDialog = true }, modifier = Modifier.fillMaxWidth()) {
@@ -112,6 +120,7 @@ fun EditDayScreen(
                 selected = state.display,
                 solarLabel = "默认展示新历",
                 lunarLabel = "默认展示农历",
+                groupTag = "display-options",
                 onSelected = onDisplayChange,
             )
 
@@ -193,21 +202,41 @@ private fun CalendarChoices(
     selected: CalendarSystem,
     solarLabel: String,
     lunarLabel: String,
+    groupTag: String,
     onSelected: (CalendarSystem) -> Unit,
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(
-            selected = selected == CalendarSystem.SOLAR,
-            onClick = { onSelected(CalendarSystem.SOLAR) },
-            label = { Text(solarLabel) },
-            modifier = Modifier.weight(1f),
-        )
-        FilterChip(
-            selected = selected == CalendarSystem.LUNAR,
-            onClick = { onSelected(CalendarSystem.LUNAR) },
-            label = { Text(lunarLabel) },
-            modifier = Modifier.weight(1f),
-        )
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag(groupTag).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf(
+            CalendarSystem.SOLAR to solarLabel,
+            CalendarSystem.LUNAR to lunarLabel,
+        ).forEach { (calendar, label) ->
+            val isSelected = selected == calendar
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .selectable(
+                        selected = isSelected,
+                        role = Role.RadioButton,
+                        onClick = { onSelected(calendar) },
+                    ),
+                shape = MaterialTheme.shapes.medium,
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label)
+                }
+            }
+        }
     }
 }
 
@@ -229,7 +258,7 @@ private fun PreviewCard(preview: DayCardModel.Ready) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("保存预览", style = MaterialTheme.typography.labelLarge)
-            Text("还有 ${preview.occurrence.daysRemaining} 天", style = MaterialTheme.typography.headlineMedium)
+            Text(countdownCopy(preview.occurrence.daysRemaining), style = MaterialTheme.typography.headlineMedium)
             Text("${calendarName(preview.day.basis)}为倒计时基准")
             Text("${calendarName(preview.displayedDate.calendar)} ${preview.displayedDate.text}")
         }
@@ -245,20 +274,30 @@ private fun MonthDayDialog(
     onConfirm: (Int, Int) -> Unit,
 ) {
     var month by remember(initialMonth) { mutableIntStateOf(initialMonth.coerceIn(1, 12)) }
-    var day by remember(initialDay) { mutableIntStateOf(initialDay.coerceIn(1, 30)) }
+    var day by remember(initialDay, calendar, initialMonth) {
+        mutableIntStateOf(initialDay.coerceIn(1, dayMaximum(calendar, initialMonth.coerceIn(1, 12))))
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("选择${calendarName(calendar)}日期") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                NumberSelector("月份", month, 1, 12) { month = it }
-                NumberSelector("日期", day, 1, if (calendar == CalendarSystem.LUNAR) 30 else 31) { day = it }
+                NumberSelector("月份", month, 1, 12) { selectedMonth ->
+                    month = selectedMonth
+                    day = day.coerceAtMost(dayMaximum(calendar, selectedMonth))
+                }
+                NumberSelector("日期", day, 1, dayMaximum(calendar, month)) { day = it }
                 Text("可选择 2 月 29 日或农历三十，缺少该日期的年份将按规则调整。")
             }
         },
         confirmButton = { TextButton(onClick = { onConfirm(month, day) }) { Text("确定") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
+}
+
+private fun dayMaximum(calendar: CalendarSystem, month: Int): Int = when (calendar) {
+    CalendarSystem.SOLAR -> Month.of(month).maxLength()
+    CalendarSystem.LUNAR -> 30
 }
 
 @Composable

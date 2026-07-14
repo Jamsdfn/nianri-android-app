@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.core.app.ActivityScenario
+import androidx.lifecycle.Lifecycle
 import com.nianri.app.MainActivity
 import com.nianri.app.data.UiPreferences
 import com.nianri.app.domain.DayCardModel
@@ -437,6 +438,22 @@ class HomeScreenTest {
 
         ActivityScenario.launch<MainActivity>(intent).use {
             composeRule.onNodeWithText("重要日子").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun importantDayExtraBackReturnsHome() {
+        val intent = Intent(context, MainActivity::class.java)
+            .putExtra("importantDayId", 88L)
+
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            composeRule.onNodeWithText("返回").performClick()
+            composeRule.onNodeWithText("念日").assertIsDisplayed()
+            scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            composeRule.waitUntil(timeoutMillis = 3_000) {
+                scenario.state == Lifecycle.State.DESTROYED
+            }
+            assertEquals(Lifecycle.State.DESTROYED, scenario.state)
         }
     }
 

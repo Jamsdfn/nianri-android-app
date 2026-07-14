@@ -3,11 +3,16 @@ package com.nianri.app.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsSelectable
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
 import com.nianri.app.domain.DayCardModel
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.DisplayDate
@@ -92,6 +97,84 @@ class EditDayScreenTest {
             assertTrue(pinned)
             assertTrue(saved)
         }
+    }
+
+    @Test
+    fun basisAndDisplayChoicesExposeRadioButtonSemantics() {
+        compose.setContent {
+            EditDayScreen(
+                state = state(), widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = {}, onDisplayChange = {},
+                onToggleReminder = {}, onPinnedChange = {}, onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithTag("basis-options")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
+        compose.onNodeWithTag("display-options")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
+        compose.onNodeWithText("新历基准")
+            .assertIsSelectable()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+        compose.onNodeWithText("默认展示农历")
+            .assertIsSelectable()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+    }
+
+    @Test
+    fun solarPickerPreservesThirtyFirst() {
+        var selectedDay = 0
+        compose.setContent {
+            EditDayScreen(
+                state = state().copy(month = 12, day = 31), widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = { selectedDay = it }, onDisplayChange = {},
+                onToggleReminder = {}, onPinnedChange = {}, onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithText("新历 12 月 31 日").performClick()
+        compose.onNodeWithText("确定").performClick()
+
+        compose.runOnIdle { assertEquals(31, selectedDay) }
+    }
+
+    @Test
+    fun solarPickerPreservesFebruaryTwentyNinth() {
+        var selectedDay = 0
+        compose.setContent {
+            EditDayScreen(
+                state = state().copy(month = 2, day = 29), widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = { selectedDay = it }, onDisplayChange = {},
+                onToggleReminder = {}, onPinnedChange = {}, onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithText("新历 2 月 29 日").performClick()
+        compose.onNodeWithText("确定").performClick()
+
+        compose.runOnIdle { assertEquals(29, selectedDay) }
+    }
+
+    @Test
+    fun previewUsesFriendlyTodayCopy() {
+        compose.setContent {
+            EditDayScreen(
+                state = state().copy(
+                    preview = state().preview?.copy(
+                        occurrence = Occurrence(LocalDate.of(2026, 8, 6), 0),
+                    ),
+                ),
+                widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = {}, onDisplayChange = {},
+                onToggleReminder = {}, onPinnedChange = {}, onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithText("就是今天").performScrollTo().assertIsDisplayed()
     }
 
     @Test

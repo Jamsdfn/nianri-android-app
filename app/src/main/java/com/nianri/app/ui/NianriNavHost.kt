@@ -29,6 +29,12 @@ fun NianriNavHost(
     val startDestination = remember(importantDayId) {
         importantDayId?.let { "detail/$it" } ?: "home"
     }
+    fun navigateHomeClearingStack() {
+        navController.navigate("home") {
+            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
     NavHost(navController = navController, startDestination = startDestination) {
         composable("home") {
             val homeViewModel: HomeViewModel = viewModel(
@@ -60,7 +66,11 @@ fun NianriNavHost(
             val state by editViewModel.uiState.collectAsStateWithLifecycle()
             EditDayScreen(
                 state = state,
-                onBack = navController::popBackStack,
+                onBack = {
+                    if (!navController.popBackStack()) {
+                        navigateHomeClearingStack()
+                    }
+                },
                 onNameChange = editViewModel::setName,
                 onBasisChange = editViewModel::setBasis,
                 onMonthChange = editViewModel::setMonth,
@@ -80,9 +90,7 @@ fun NianriNavHost(
                     }
                 },
                 onDeleted = {
-                    navController.navigate("home") {
-                        popUpTo("home") { inclusive = true }
-                    }
+                    navigateHomeClearingStack()
                 },
             )
         }
@@ -97,13 +105,15 @@ fun NianriNavHost(
             val state by detailViewModel.uiState.collectAsStateWithLifecycle()
             DetailScreen(
                 state = state,
-                onBack = navController::popBackStack,
+                onBack = {
+                    if (!navController.popBackStack()) {
+                        navigateHomeClearingStack()
+                    }
+                },
                 onEdit = { id -> navController.navigate("edit?dayId=$id") },
                 onDelete = detailViewModel::delete,
                 onDeleted = {
-                    navController.navigate("home") {
-                        popUpTo("home") { inclusive = true }
-                    }
+                    navigateHomeClearingStack()
                 },
             )
         }

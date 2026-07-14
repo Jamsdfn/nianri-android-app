@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nianri.app.domain.DayCardModel
 import com.nianri.app.domain.model.CalendarSystem
+import com.nianri.app.ui.countdownCopy
 import com.nianri.app.ui.theme.Night800
 import com.nianri.app.ui.theme.Night950
 import com.nianri.app.ui.theme.TextMuted
@@ -315,7 +316,7 @@ private fun DisplayToggle(
 private fun ReadyCardBody(model: DayCardModel.Ready, isHero: Boolean) {
     if (isHero) {
         Text(
-            text = remainingText(model.occurrence.daysRemaining),
+            text = countdownCopy(model.occurrence.daysRemaining),
             color = Violet300,
             fontSize = if (model.occurrence.daysRemaining == 0L) 34.sp else 58.sp,
             lineHeight = 60.sp,
@@ -356,7 +357,7 @@ private fun ReadyCardBody(model: DayCardModel.Ready, isHero: Boolean) {
                 )
             }
             Text(
-                remainingText(model.occurrence.daysRemaining),
+                countdownCopy(model.occurrence.daysRemaining),
                 color = Violet300,
                 fontSize = if (model.occurrence.daysRemaining == 0L) 18.sp else 24.sp,
                 fontWeight = FontWeight.Bold,
@@ -399,9 +400,4 @@ private fun EmptyState(onAdd: () -> Unit) {
             Text("新建重要日子", color = Violet300, fontWeight = FontWeight.SemiBold)
         }
     }
-}
-
-private fun remainingText(daysRemaining: Long): String = when (daysRemaining) {
-    0L -> "就是今天"
-    else -> "$daysRemaining 天"
 }

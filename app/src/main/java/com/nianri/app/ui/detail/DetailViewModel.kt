@@ -16,9 +16,12 @@ import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class DetailUiState(
@@ -36,7 +39,7 @@ data class DetailUiState(
 
 class DetailViewModel(
     private val dayId: Long,
-    private val loadDay: suspend (Long) -> ImportantDay?,
+    private val day: Flow<ImportantDay?>,
     private val countWidgetReferences: suspend (Long) -> Int,
     private val deleteDay: suspend (Long) -> Unit,
     private val calculator: DateOccurrenceCalculator,
@@ -47,7 +50,9 @@ class DetailViewModel(
     val uiState: StateFlow<DetailUiState> = mutableState.asStateFlow()
 
     init {
-        viewModelScope.launch { load() }
+        viewModelScope.launch {
+            day.collectLatest(::project)
+        }
     }
 
     fun delete() {
@@ -62,28 +67,40 @@ class DetailViewModel(
         }
     }
 
-    private suspend fun load() {
-        try {
-            val day = loadDay(dayId)
-            if (day == null) {
-                mutableState.value = DetailUiState(isLoading = false, error = "未找到这个日子")
-                return
-            }
-            val occurrence = calculator.next(day, LocalDate.now(clock))
-            mutableState.value = DetailUiState(
-                day = day,
-                occurrence = occurrence,
-                solarDate = converter.displayDate(occurrence.solarDate, CalendarSystem.SOLAR),
-                lunarDate = converter.displayDate(occurrence.solarDate, CalendarSystem.LUNAR),
-                adjustmentCopy = adjustmentCopy(occurrence.adjustment),
-                reminderSummary = reminderSummary(day.reminders),
-                widgetReferences = countWidgetReferences(dayId),
-                isLoading = false,
-            )
+    private suspend fun project(currentDay: ImportantDay?) {
+        if (currentDay == null) {
+            mutableState.value = DetailUiState(isLoading = false, error = "未找到这个日子")
+            return
+        }
+        val widgetReferences = try {
+            countWidgetReferences(dayId)
         } catch (error: Exception) {
             if (error is CancellationException) throw error
-            mutableState.value = DetailUiState(isLoading = false, error = "日期计算失败，请稍后重试")
+            0
         }
+        var occurrence: Occurrence? = null
+        var solarDate: DisplayDate? = null
+        var lunarDate: DisplayDate? = null
+        var errorCopy: String? = null
+        try {
+            occurrence = calculator.next(currentDay, LocalDate.now(clock))
+            solarDate = converter.displayDate(occurrence.solarDate, CalendarSystem.SOLAR)
+            lunarDate = converter.displayDate(occurrence.solarDate, CalendarSystem.LUNAR)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            errorCopy = "日期暂不可用"
+        }
+        mutableState.value = DetailUiState(
+            day = currentDay,
+            occurrence = occurrence,
+            solarDate = solarDate,
+            lunarDate = lunarDate,
+            adjustmentCopy = adjustmentCopy(occurrence?.adjustment),
+            reminderSummary = reminderSummary(currentDay.reminders),
+            widgetReferences = widgetReferences,
+            isLoading = false,
+            error = errorCopy,
+        )
     }
 
     class Factory(
@@ -95,7 +112,9 @@ class DetailViewModel(
             require(modelClass.isAssignableFrom(DetailViewModel::class.java))
             return DetailViewModel(
                 dayId = dayId,
-                loadDay = container.importantDays::get,
+                day = container.importantDays.observeAll().map { days ->
+                    days.firstOrNull { it.id == dayId }
+                },
                 countWidgetReferences = container.widgets::countReferences,
                 deleteDay = container.dayMutationCoordinator::delete,
                 calculator = container.occurrenceCalculator,
@@ -107,8 +126,8 @@ class DetailViewModel(
 }
 
 internal fun adjustmentCopy(adjustment: DateAdjustment?): String? = when (adjustment) {
-    DateAdjustment.NON_LEAP_YEAR -> "非闰年按 2 月 28 日计算"
-    DateAdjustment.SHORT_LUNAR_MONTH -> "农历小月按廿九计算"
+    DateAdjustment.NON_LEAP_YEAR -> "今年不是闰年，本次提前 1 天至 2 月 28 日"
+    DateAdjustment.SHORT_LUNAR_MONTH -> "本月只有二十九天，本次提前 1 天至廿九"
     null -> null
 }
 

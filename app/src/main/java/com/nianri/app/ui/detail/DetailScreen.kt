@@ -30,6 +30,7 @@ import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.domain.model.Occurrence
 import com.nianri.app.ui.edit.DeleteConfirmationDialog
+import com.nianri.app.ui.countdownCopy
 import com.nianri.app.ui.theme.NianriTheme
 import java.time.LocalDate
 
@@ -60,16 +61,23 @@ fun DetailScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             val day = state.day
             val occurrence = state.occurrence
-            if (day != null && occurrence != null) {
+            if (day == null) {
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            } else {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text("${calendarName(day.basis)}为倒计时基准")
-                        Text("还有 ${occurrence.daysRemaining} 天", style = MaterialTheme.typography.displaySmall)
+                        Text(
+                            occurrence?.let { countdownCopy(it.daysRemaining) } ?: "日期暂不可用",
+                            style = MaterialTheme.typography.displaySmall,
+                        )
                         Text(day.name, style = MaterialTheme.typography.titleLarge)
                     }
+                }
+                if (state.error != null && occurrence != null) {
+                    Text(state.error, color = MaterialTheme.colorScheme.error)
                 }
                 DateRow("本次对应的新历日期", state.solarDate)
                 DateRow("本次对应的农历日期", state.lunarDate)
