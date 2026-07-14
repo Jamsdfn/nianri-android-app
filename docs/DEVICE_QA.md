@@ -82,5 +82,5 @@ ADB 已无线连接用户的小米 15 Pro，并完成保留数据的覆盖安装
 - 交付 APK 是 debug APK，不是商店签名 release 包。
 - APK：`app/build/outputs/apk/debug/app-debug.apk`
 - 本轮小部件即时交互修复记录在 `feature/nianri-app` 分支最新提交。
-- 当前 debug APK SHA-256：`278115143621e52e1d8a3ed9cf3ba57edab5eec2d1465d9e1ac5c3c9578ffa96`
+- 当前 debug APK SHA-256：`509783b18762e35b819cd332523562c7accc6866536a7a70ac65b3dca85bc46a`
 - 最终 clean gate：`PASS / AUTOMATED`。四版本设备测试、单元测试、Lint 和 debug APK 构建全部通过。
