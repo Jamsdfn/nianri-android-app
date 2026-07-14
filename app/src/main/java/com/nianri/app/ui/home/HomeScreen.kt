@@ -2,33 +2,45 @@ package com.nianri.app.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,16 +60,26 @@ fun HomeScreen(
     onOpen: (Long) -> Unit = {},
     onToggleDisplay: (Long) -> Unit = {},
     onDismissCalendarExplanation: () -> Unit = {},
+    onDisplayErrorShown: () -> Unit = {},
+    safeDrawingInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(state.displayError) {
+        val error = state.displayError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(error)
+        onDisplayErrorShown()
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .testTag("home-root")
             .background(
                 Brush.radialGradient(
                     colors = listOf(Color(0xFF353B8B), Night950),
                     radius = 1200f,
                 ),
-            ),
+            )
+            .windowInsetsPadding(safeDrawingInsets),
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -80,8 +102,14 @@ fun HomeScreen(
                         color = TextPrimary,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
+                        modifier = Modifier.testTag("home-title"),
                     )
-                    TextButton(onClick = onAdd) {
+                    TextButton(
+                        onClick = onAdd,
+                        modifier = Modifier
+                            .testTag("home-add")
+                            .semantics { contentDescription = "新建重要日子" },
+                    ) {
                         Text("＋", fontSize = 26.sp, color = TextPrimary)
                     }
                 }
@@ -135,6 +163,7 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp)
+                .testTag("home-fab")
                 .size(58.dp),
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Violet500),
@@ -142,6 +171,12 @@ fun HomeScreen(
         ) {
             Text("＋", fontSize = 28.sp, color = TextPrimary)
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 96.dp),
+        )
     }
 }
 
@@ -240,24 +275,37 @@ private fun DisplayToggle(
             modifier = Modifier
                 .padding(top = 3.dp)
                 .background(Color(0x6611132C), RoundedCornerShape(99.dp))
-                .padding(2.dp),
+                .padding(horizontal = 2.dp)
+                .selectableGroup(),
         ) {
             listOf(CalendarSystem.SOLAR to "新历", CalendarSystem.LUNAR to "农历").forEach { (calendar, label) ->
                 val selected = model.day.appDisplay == calendar
                 val action = if (calendar == CalendarSystem.LUNAR) "农历" else "新历"
-                Text(
-                    text = label,
-                    color = if (selected) TextPrimary else TextMuted,
-                    fontSize = 11.sp,
+                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(99.dp))
-                        .background(if (selected) Violet500 else Color.Transparent)
+                        .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                        .selectable(
+                            selected = selected,
+                            role = Role.RadioButton,
+                            onClick = {
+                                if (!selected) onToggleDisplay(model.day.id)
+                            },
+                        )
                         .semantics {
                             contentDescription = "${model.day.name}切换为${action}展示"
-                        }
-                        .clickable(enabled = !selected) { onToggleDisplay(model.day.id) }
-                        .padding(horizontal = 9.dp, vertical = 6.dp),
-                )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = label,
+                        color = if (selected) TextPrimary else TextMuted,
+                        fontSize = 11.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(if (selected) Violet500 else Color.Transparent)
+                            .padding(horizontal = 9.dp, vertical = 6.dp),
+                    )
+                }
             }
         }
     }

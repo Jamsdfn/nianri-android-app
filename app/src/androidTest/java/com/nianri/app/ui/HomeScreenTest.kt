@@ -1,15 +1,26 @@
 package com.nianri.app.ui
 
 import android.content.Context
+import android.content.Intent
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelectable
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.core.app.ActivityScenario
@@ -115,6 +126,32 @@ class HomeScreenTest {
     }
 
     @Test
+    fun displayOptionsAreRadioButtonsWithAccessibleTouchBounds() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(
+                    pinned = readyDay(id = 43, name = "妈妈生日", days = 23, pinned = true),
+                    showCalendarExplanation = false,
+                ),
+            )
+        }
+
+        val solar = composeRule.onNodeWithContentDescription("妈妈生日切换为新历展示")
+            .assertIsSelectable()
+            .assertIsSelected()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+        val lunar = composeRule.onNodeWithContentDescription("妈妈生日切换为农历展示")
+            .assertIsSelectable()
+            .assertIsNotSelected()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+
+        val solarBounds = solar.getUnclippedBoundsInRoot()
+        val lunarBounds = lunar.getUnclippedBoundsInRoot()
+        assertTrue(solarBounds.bottom - solarBounds.top >= 48.dp)
+        assertTrue(lunarBounds.bottom - lunarBounds.top >= 48.dp)
+    }
+
+    @Test
     fun emptyStateOffersCreateAction() {
         var addCount = 0
         composeRule.setContent {
@@ -152,6 +189,33 @@ class HomeScreenTest {
         composeRule.onNodeWithText("日期暂不可用").assertIsDisplayed()
         composeRule.onNodeWithText("编辑").performClick()
         composeRule.runOnIdle { assertEquals(17L, opened) }
+    }
+
+    @Test
+    fun unavailableCardDisplayToggleIsIndependentFromOpenAction() {
+        val events = mutableListOf<String>()
+        val day = ImportantDay(
+            id = 18,
+            name = "旧历生日",
+            basis = CalendarSystem.LUNAR,
+            month = 8,
+            day = 30,
+            appDisplay = CalendarSystem.SOLAR,
+        )
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(
+                    upcoming = listOf(DayCardModel.Unavailable(day)),
+                    showCalendarExplanation = false,
+                ),
+                onOpen = { events += "open:$it" },
+                onToggleDisplay = { events += "toggle:$it" },
+            )
+        }
+
+        composeRule.onNodeWithContentDescription("旧历生日切换为农历展示").performClick()
+
+        composeRule.runOnIdle { assertEquals(listOf("toggle:18"), events) }
     }
 
     @Test
@@ -203,6 +267,60 @@ class HomeScreenTest {
     }
 
     @Test
+    fun failedDisplayUpdateRollsBackAndShowsRetryMessage() {
+        val original = readyDay(id = 9, name = "爸爸生日", days = 12, pinned = true)
+        val cards = MutableStateFlow(listOf(original))
+        val viewModel = HomeViewModel(
+            cards = cards,
+            updateAppDisplay = { _, _ -> error("database unavailable") },
+            converter = IcuCalendarConverter(),
+            uiPreferences = UiPreferences(context),
+        )
+        composeRule.setContent {
+            val state by viewModel.uiState.collectAsState()
+            HomeScreen(state = state, onToggleDisplay = viewModel::toggleDisplay)
+        }
+        composeRule.waitUntil { viewModel.uiState.value.pinned != null }
+
+        composeRule.onNodeWithContentDescription("爸爸生日切换为农历展示").performClick()
+
+        composeRule.waitUntil {
+            viewModel.uiState.value.pinned?.day?.appDisplay == CalendarSystem.SOLAR
+        }
+        composeRule.onNodeWithText("切换失败，请重试").assertIsDisplayed()
+    }
+
+    @Test
+    fun acknowledgedOverrideDoesNotMaskLaterRepositoryChange() {
+        val original = readyDay(id = 10, name = "纪念日", days = 30, pinned = true)
+        val cards = MutableStateFlow(listOf(original))
+        val viewModel = HomeViewModel(
+            cards = cards,
+            updateAppDisplay = { _, _ -> },
+            converter = IcuCalendarConverter(),
+            uiPreferences = UiPreferences(context),
+        )
+        composeRule.setContent {
+            val state by viewModel.uiState.collectAsState()
+            HomeScreen(state = state, onToggleDisplay = viewModel::toggleDisplay)
+        }
+        composeRule.waitUntil { viewModel.uiState.value.pinned != null }
+
+        composeRule.onNodeWithContentDescription("纪念日切换为农历展示").performClick()
+        composeRule.waitUntil {
+            viewModel.uiState.value.pinned?.day?.appDisplay == CalendarSystem.LUNAR
+        }
+        cards.value = listOf(original.withDisplay(CalendarSystem.LUNAR, "农历六月廿四"))
+        composeRule.waitForIdle()
+        cards.value = listOf(original.withDisplay(CalendarSystem.SOLAR, "仓库更新后的新历日期"))
+
+        composeRule.waitUntil {
+            viewModel.uiState.value.pinned?.day?.appDisplay == CalendarSystem.SOLAR
+        }
+        composeRule.onNodeWithText("仓库更新后的新历日期").assertIsDisplayed()
+    }
+
+    @Test
     fun appShellUsesLightSystemBarIcons() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
@@ -214,6 +332,52 @@ class HomeScreenTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun mainActivityWithoutExtraStartsAtHome() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            composeRule.onNodeWithText("念日").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun homeAddActionNavigatesToEdit() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            composeRule.onNodeWithTag("home-add").performClick()
+            composeRule.onNodeWithText("编辑重要日子").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun importantDayExtraStartsAtDetail() {
+        val intent = Intent(context, MainActivity::class.java)
+            .putExtra("importantDayId", 88L)
+
+        ActivityScenario.launch<MainActivity>(intent).use {
+            composeRule.onNodeWithText("重要日子详情").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun homeContentAndFabRespectSafeDrawingInsets() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(showCalendarExplanation = false),
+                safeDrawingInsets = WindowInsets(
+                    left = 0.dp,
+                    top = 40.dp,
+                    right = 0.dp,
+                    bottom = 60.dp,
+                ),
+            )
+        }
+
+        val root = composeRule.onNodeWithTag("home-root").getUnclippedBoundsInRoot()
+        val title = composeRule.onNodeWithTag("home-title").getUnclippedBoundsInRoot()
+        val fab = composeRule.onNodeWithTag("home-fab").getUnclippedBoundsInRoot()
+        assertTrue(title.top >= root.top + 40.dp)
+        assertTrue(fab.bottom <= root.bottom - 60.dp)
     }
 
     private fun readyDay(
@@ -234,5 +398,13 @@ class HomeScreenTest {
         ),
         occurrence = Occurrence(LocalDate.of(2026, 8, 6), days),
         displayedDate = DisplayDate(CalendarSystem.SOLAR, "2026年8月6日 · 星期四"),
+    )
+
+    private fun DayCardModel.Ready.withDisplay(
+        display: CalendarSystem,
+        text: String,
+    ) = copy(
+        day = day.copy(appDisplay = display),
+        displayedDate = DisplayDate(display, text),
     )
 }

@@ -13,13 +13,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val pinned: DayCardModel? = null,
     val upcoming: List<DayCardModel> = emptyList(),
     val showCalendarExplanation: Boolean = true,
+    val displayError: String? = null,
 )
 
 class HomeViewModel(
@@ -29,12 +33,33 @@ class HomeViewModel(
     private val uiPreferences: UiPreferences,
 ) : ViewModel() {
     private val displayOverrides = MutableStateFlow<Map<Long, CalendarSystem>>(emptyMap())
+    private val displayError = MutableStateFlow<String?>(null)
+    private val sourceCards = cards.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = emptyList(),
+    )
+
+    init {
+        viewModelScope.launch {
+            sourceCards.collect { projectedCards ->
+                displayOverrides.update { overrides ->
+                    overrides.filterNot { (dayId, display) ->
+                        projectedCards.any { model ->
+                            model.day.id == dayId && model.day.appDisplay == display
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     val uiState: StateFlow<HomeUiState> = combine(
-        cards,
+        sourceCards,
         displayOverrides,
         uiPreferences.calendarExplanationSeen,
-    ) { projectedCards, overrides, explanationSeen ->
+        displayError,
+    ) { projectedCards, overrides, explanationSeen, error ->
         val cardsWithOverrides = projectedCards.map { model ->
             val display = overrides[model.day.id]
             if (model is DayCardModel.Ready && display != null) {
@@ -51,6 +76,7 @@ class HomeViewModel(
             pinned = pinned,
             upcoming = cardsWithOverrides.filterNot { it === pinned },
             showCalendarExplanation = !explanationSeen,
+            displayError = error,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -68,10 +94,22 @@ class HomeViewModel(
             CalendarSystem.SOLAR -> CalendarSystem.LUNAR
             CalendarSystem.LUNAR -> CalendarSystem.SOLAR
         }
-        displayOverrides.value = displayOverrides.value + (dayId to display)
+        displayOverrides.update { it + (dayId to display) }
         viewModelScope.launch {
-            updateAppDisplay(dayId, display)
+            try {
+                updateAppDisplay(dayId, display)
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                displayOverrides.update { overrides ->
+                    if (overrides[dayId] == display) overrides - dayId else overrides
+                }
+                displayError.value = DISPLAY_ERROR
+            }
         }
+    }
+
+    fun clearDisplayError() {
+        displayError.value = null
     }
 
     fun dismissCalendarExplanation() {
@@ -92,5 +130,9 @@ class HomeViewModel(
                 uiPreferences = uiPreferences,
             ) as T
         }
+    }
+
+    private companion object {
+        const val DISPLAY_ERROR = "切换失败，请重试"
     }
 }

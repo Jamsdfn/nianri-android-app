@@ -42,6 +42,7 @@ fun NianriNavHost(
                 onOpen = { id -> navController.navigate("detail/$id") },
                 onToggleDisplay = homeViewModel::toggleDisplay,
                 onDismissCalendarExplanation = homeViewModel::dismissCalendarExplanation,
+                onDisplayErrorShown = homeViewModel::clearDisplayError,
             )
         }
         composable(
