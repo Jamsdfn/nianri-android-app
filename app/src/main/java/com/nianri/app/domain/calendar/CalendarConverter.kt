@@ -5,6 +5,21 @@ import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.LunarDate
 import java.time.LocalDate
 
+open class CalendarOperationException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+
+class CalendarCalculationException(
+    message: String,
+    cause: Throwable? = null,
+) : CalendarOperationException(message, cause)
+
+class CalendarConversionException(
+    message: String,
+    cause: Throwable? = null,
+) : CalendarOperationException(message, cause)
+
 interface CalendarConverter {
     fun lunarFromSolar(solarDate: LocalDate): LunarDate
 

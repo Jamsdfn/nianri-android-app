@@ -1,12 +1,14 @@
 package com.nianri.app.domain
 
 import com.nianri.app.data.ImportantDayRepository
+import com.nianri.app.domain.calendar.CalendarOperationException
 import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.domain.model.Occurrence
 import java.time.Clock
+import java.time.DateTimeException
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -49,7 +51,9 @@ class DayListProjector(
                 occurrence = occurrence,
                 displayedDate = converter.displayDate(occurrence.solarDate, day.appDisplay),
             )
-        } catch (_: Exception) {
+        } catch (_: CalendarOperationException) {
+            DayCardModel.Unavailable(day)
+        } catch (_: DateTimeException) {
             DayCardModel.Unavailable(day)
         }
 }

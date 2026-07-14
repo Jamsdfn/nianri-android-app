@@ -12,6 +12,8 @@ import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.calendar.IcuCalendarConverter
 import com.nianri.app.reminder.ReminderScheduler
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 
 class AppContainer(context: Context) {
     private val applicationContext = context.applicationContext
@@ -27,14 +29,14 @@ class AppContainer(context: Context) {
     val occurrenceCalculator by lazy { DateOccurrenceCalculator(calendarConverter) }
     val importantDays by lazy { ImportantDayRepository(database) }
     val widgets by lazy { WidgetRepository(database) }
-    val reminderScheduler: ReminderScheduler by lazy { NoOpReminderScheduler }
-    val widgetUpdater: WidgetUpdater by lazy { WidgetUpdater { } }
+    val reminderScheduler: ReminderScheduler by lazy { DeferredReminderScheduler }
+    val widgetUpdater: WidgetUpdater by lazy { DeferredWidgetUpdater }
     val dayListProjector by lazy {
         DayListProjector(
             days = importantDays,
             calculator = occurrenceCalculator,
             converter = calendarConverter,
-            clock = Clock.systemDefaultZone(),
+            clock = CurrentSystemZoneClock(),
         )
     }
     val dayMutationCoordinator by lazy {
@@ -44,12 +46,33 @@ class AppContainer(context: Context) {
             widgets = widgetUpdater,
         )
     }
+}
 
-    private data object NoOpReminderScheduler : ReminderScheduler {
-        override suspend fun replace(dayId: Long) = Unit
+class CurrentSystemZoneClock(
+    private val instantSource: Clock = Clock.systemUTC(),
+    private val zoneSupplier: () -> ZoneId = ZoneId::systemDefault,
+) : Clock() {
+    override fun getZone(): ZoneId = zoneSupplier()
 
-        override suspend fun cancel(dayId: Long) = Unit
+    override fun withZone(zone: ZoneId): Clock = instantSource.withZone(zone)
 
-        override suspend fun rebuildAll() = Unit
-    }
+    override fun instant(): Instant = instantSource.instant()
+}
+
+internal data object DeferredReminderScheduler : ReminderScheduler {
+    override suspend fun replace(dayId: Long): Nothing = unwired()
+
+    override suspend fun cancel(dayId: Long): Nothing = unwired()
+
+    override suspend fun rebuildAll(): Nothing = unwired()
+
+    private fun unwired(): Nothing = throw IllegalStateException(
+        "ReminderScheduler adapter is not wired; Task 7 must provide the Android binding",
+    )
+}
+
+internal data object DeferredWidgetUpdater : WidgetUpdater {
+    override suspend fun updateAll(): Nothing = throw IllegalStateException(
+        "WidgetUpdater adapter is not wired; Task 8 or 9 must provide the Android binding",
+    )
 }

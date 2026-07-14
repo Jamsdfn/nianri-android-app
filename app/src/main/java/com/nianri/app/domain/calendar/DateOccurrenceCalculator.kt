@@ -56,7 +56,7 @@ class DateOccurrenceCalculator(private val converter: CalendarConverter) {
                 }
             }
         }
-        error("No lunar occurrence found within 420 days")
+        throw CalendarCalculationException("No lunar occurrence found within 420 days")
     }
 
     private fun solarCandidate(
