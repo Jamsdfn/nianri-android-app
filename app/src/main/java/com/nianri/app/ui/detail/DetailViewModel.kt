@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.nianri.app.AppContainer
 import com.nianri.app.CurrentSystemZoneClock
+import com.nianri.app.domain.WidgetUpdateUnavailableException
 import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.model.CalendarSystem
@@ -60,6 +61,8 @@ class DetailViewModel(
             try {
                 deleteDay(dayId)
                 mutableState.update { it.copy(deleted = true) }
+            } catch (error: WidgetUpdateUnavailableException) {
+                mutableState.update { it.copy(error = error.message ?: "已有小部件配置，暂时无法修改") }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 mutableState.update { it.copy(error = "删除失败，请重试") }

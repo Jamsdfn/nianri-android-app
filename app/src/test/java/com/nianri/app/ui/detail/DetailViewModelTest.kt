@@ -2,6 +2,7 @@ package com.nianri.app.ui.detail
 
 import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
+import com.nianri.app.domain.WidgetUpdateUnavailableException
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.DateAdjustment
 import com.nianri.app.domain.model.DisplayDate
@@ -13,6 +14,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,6 +65,23 @@ class DetailViewModelTest {
     }
 
     @Test
+    fun `widget capability block keeps record and exposes its real delete message`() {
+        days = MutableStateFlow(day())
+        val message = "已有小部件配置，完成小部件更新能力前不能修改日子"
+        val viewModel = viewModel(
+            deleteDay = { throw WidgetUpdateUnavailableException(message) },
+        )
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        viewModel.delete()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(message, viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.deleted)
+        assertEquals(day(), days.value)
+    }
+
+    @Test
     fun `detail refreshes when edited record emits after returning`() {
         days = MutableStateFlow(day())
         val viewModel = viewModel()
@@ -101,11 +120,14 @@ class DetailViewModelTest {
         )
     }
 
-    private fun viewModel(calendarConverter: CalendarConverter = converter) = DetailViewModel(
+    private fun viewModel(
+        calendarConverter: CalendarConverter = converter,
+        deleteDay: suspend (Long) -> Unit = { deleted += it },
+    ) = DetailViewModel(
         dayId = 42,
         day = days,
         countWidgetReferences = { 2 },
-        deleteDay = { deleted += it },
+        deleteDay = deleteDay,
         calculator = DateOccurrenceCalculator(calendarConverter),
         converter = calendarConverter,
         clock = Clock.fixed(Instant.parse("2027-01-01T00:00:00Z"), ZoneOffset.UTC),
