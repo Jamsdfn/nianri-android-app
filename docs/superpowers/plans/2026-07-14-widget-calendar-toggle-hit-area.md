@@ -173,3 +173,125 @@ adb -s adb-94cbaaa0-SEIjCm._adb-tls-connect._tcp install -r \
 ```
 
 Expected: `Success`. On both widgets, tapping the left, center, and right portions of the bottom date row toggles display; tapping the upper content opens the App detail.
+
+---
+
+### Task 2: Add the Confirmed B1 App Icon
+
+**Files:**
+- Create: `app/src/test/java/com/nianri/app/AppIconResourcesTest.kt`
+- Create: `app/src/main/res/values/icon_colors.xml`
+- Create: `app/src/main/res/drawable/ic_launcher_background.xml`
+- Create: `app/src/main/res/drawable/ic_launcher_foreground.xml`
+- Create: `app/src/main/res/drawable/ic_launcher_monochrome.xml`
+- Create: `app/src/main/res/mipmap-anydpi/ic_launcher.xml`
+- Create: `app/src/main/res/mipmap-anydpi/ic_launcher_round.xml`
+- Create: `app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
+- Create: `app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
+- Create: `app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml`
+- Create: `app/src/main/res/mipmap-anydpi-v33/ic_launcher_round.xml`
+- Modify: `app/src/main/AndroidManifest.xml`
+
+**Interfaces:**
+- Consumes: the approved B1 palette and SVG geometry in `docs/superpowers/specs/2026-07-14-nianri-app-icon-design.md`.
+- Produces: `@mipmap/ic_launcher` and `@mipmap/ic_launcher_round`, including Android 13 monochrome metadata.
+
+- [ ] **Step 1: Write a failing resource contract test**
+
+Create `AppIconResourcesTest.kt` that reads source XML and asserts the application manifest references both launcher resources, all base/adaptive/monochrome files exist, and each v33 adaptive icon contains a `<monochrome>` element:
+
+```kotlin
+package com.nianri.app
+
+import java.io.File
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class AppIconResourcesTest {
+    @Test
+    fun `manifest and launcher resources provide adaptive round and monochrome icons`() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        assertTrue("android:icon=\"@mipmap/ic_launcher\"" in manifest)
+        assertTrue("android:roundIcon=\"@mipmap/ic_launcher_round\"" in manifest)
+
+        val required = listOf(
+            "res/mipmap-anydpi/ic_launcher.xml",
+            "res/mipmap-anydpi/ic_launcher_round.xml",
+            "res/mipmap-anydpi-v26/ic_launcher.xml",
+            "res/mipmap-anydpi-v26/ic_launcher_round.xml",
+            "res/mipmap-anydpi-v33/ic_launcher.xml",
+            "res/mipmap-anydpi-v33/ic_launcher_round.xml",
+            "res/drawable/ic_launcher_background.xml",
+            "res/drawable/ic_launcher_foreground.xml",
+            "res/drawable/ic_launcher_monochrome.xml",
+        )
+        required.forEach { assertTrue("missing $it", File("src/main/$it").isFile) }
+        listOf("ic_launcher.xml", "ic_launcher_round.xml").forEach { name ->
+            assertTrue("<monochrome" in File("src/main/res/mipmap-anydpi-v33/$name").readText())
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Run the test and verify RED**
+
+Run:
+
+```bash
+./gradlew testDebugUnitTest --tests com.nianri.app.AppIconResourcesTest
+```
+
+Expected: FAIL because the manifest icon references and launcher files do not exist.
+
+- [ ] **Step 3: Add B1 vector layers and launcher XML resources**
+
+Implement the approved palette exactly: `#A093FF`, `#5147B8`, `#7466E8`, `#FAF9FF`, `#D9D4FF`, and `#FFD482`. Convert the approved 164×164 SVG paths into Android vector paths for the white calendar page, two yellow binding rings, yellow solar disc, and purple lunar crescent. Use:
+
+```xml
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>
+```
+
+for v33; omit `monochrome` in v26. Base resources are complete vector composites for launcher fallback, with a rounded-square background for `ic_launcher` and a circular background for `ic_launcher_round`.
+
+- [ ] **Step 4: Reference the launcher icons from the application manifest**
+
+Add to `<application>`:
+
+```xml
+android:icon="@mipmap/ic_launcher"
+android:roundIcon="@mipmap/ic_launcher_round"
+```
+
+- [ ] **Step 5: Run icon tests, lint, and resource linking**
+
+Run:
+
+```bash
+./gradlew testDebugUnitTest --tests com.nianri.app.AppIconResourcesTest
+./gradlew lintDebug assembleDebug
+```
+
+Expected: resource contract PASS; Lint and APK assembly succeed without adaptive-icon errors.
+
+- [ ] **Step 6: Audit merged manifest and installed launcher activity**
+
+Run:
+
+```bash
+rg 'android:icon|android:roundIcon' app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml
+adb -s adb-94cbaaa0-SEIjCm._adb-tls-connect._tcp install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s adb-94cbaaa0-SEIjCm._adb-tls-connect._tcp shell cmd package resolve-activity --brief com.nianri.app
+```
+
+Expected: merged manifest references both mipmaps, installation reports `Success`, and the launcher activity resolves to `com.nianri.app/.MainActivity`.
+
+- [ ] **Step 7: Commit the icon resources**
+
+```bash
+git add app/src/main/AndroidManifest.xml app/src/main/res app/src/test/java/com/nianri/app/AppIconResourcesTest.kt
+git commit -m "feat: add Nianri app icon"
+```
