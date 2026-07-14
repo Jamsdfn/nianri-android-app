@@ -1,6 +1,7 @@
 package com.nianri.app.widget
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -81,6 +82,7 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
     val text = WidgetTextContract.wide(model)
     val detailAction = actionStartActivity(WidgetActionIntents.detail(context, model.id))
     val fontScale = context.resources.configuration.fontScale.coerceAtLeast(1f)
+    val hideSecondRow = Build.VERSION.SDK_INT <= Build.VERSION_CODES.O && fontScale >= 2f
     val basisText = when {
         fontScale >= 2f -> ""
         fontScale >= 1.3f -> text.rows[1].leading.removePrefix("按")
@@ -109,28 +111,30 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
                 maxLines = 1,
             )
         }
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (basisText.isNotEmpty()) {
+        if (!hideSecondRow) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (basisText.isNotEmpty()) {
+                    Text(
+                        basisText,
+                        style = TextStyle(SecondaryText, fontSize = cappedSp(8f, fontScale, 1f)),
+                        maxLines = 1,
+                    )
+                }
+                Spacer(GlanceModifier.defaultWeight())
                 Text(
-                    basisText,
-                    style = TextStyle(SecondaryText, fontSize = cappedSp(8f, fontScale, 1f)),
+                    text.rows[1].trailing,
+                    modifier = GlanceModifier.clickable(actionRunCallback<ToggleWidgetCalendarAction>()),
+                    style = TextStyle(
+                        PrimaryText,
+                        fontSize = cappedSp(8f, fontScale, 1f),
+                        fontWeight = FontWeight.Medium,
+                    ),
                     maxLines = 1,
                 )
             }
-            Spacer(GlanceModifier.defaultWeight())
-            Text(
-                text.rows[1].trailing,
-                modifier = GlanceModifier.clickable(actionRunCallback<ToggleWidgetCalendarAction>()),
-                style = TextStyle(
-                    PrimaryText,
-                    fontSize = cappedSp(8.5f, fontScale, 1f),
-                    fontWeight = FontWeight.Medium,
-                ),
-                maxLines = 1,
-            )
         }
     }
 }

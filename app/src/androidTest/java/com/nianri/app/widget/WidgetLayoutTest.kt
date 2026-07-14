@@ -8,6 +8,7 @@ import android.appwidget.AppWidgetHost
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
+import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -219,16 +220,17 @@ class WidgetLayoutTest {
             val squareTexts = square.textViews().map { it.text.toString() }
 
             assertTrue("wide days at $fontScale: $wideTexts", "23天" in wideTexts)
-            assertTrue("wide date at $fontScale: $wideTexts", wideTexts.any { "8/6" in it })
+            if (!(Build.VERSION.SDK_INT <= Build.VERSION_CODES.O && fontScale >= 2f)) {
+                assertTrue("wide date at $fontScale: $wideTexts", wideTexts.any { "8/6" in it })
+            }
             assertTrue("square days at $fontScale: $squareTexts", "23天" in squareTexts)
             assertTrue("square date at $fontScale: $squareTexts", squareTexts.any { "8月6日" in it })
-            assertChildrenInside(wide, verticalSafetyDp = 1, requireFontBox = true)
-            assertChildrenInside(square, verticalSafetyDp = 1, requireFontBox = true)
-
             if (fontScale == 2.0f) {
                 saveRender(wide, "wide-font-scale-2.0-110x40dp.png")
                 saveRender(square, "square-font-scale-2.0-110x110dp.png")
             }
+            assertChildrenInside(wide, verticalSafetyDp = 1, requireFontBox = true, label = "wide@$fontScale")
+            assertChildrenInside(square, verticalSafetyDp = 1, requireFontBox = true, label = "square@$fontScale")
         }
     }
 
@@ -307,6 +309,7 @@ class WidgetLayoutTest {
         root: View,
         verticalSafetyDp: Int = 0,
         requireFontBox: Boolean = false,
+        label: String = "",
     ) {
         val verticalSafetyPx = px(verticalSafetyDp)
         root.textViews().forEach {
@@ -332,7 +335,7 @@ class WidgetLayoutTest {
                     it.baseline + metrics.top >= 0,
                 )
                 assertTrue(
-                    "font bottom for ${it.text}: height=${it.height}, baseline=${it.baseline}, bottom=${metrics.bottom}",
+                    "font bottom $label for ${it.text}: height=${it.height}, baseline=${it.baseline}, bottom=${metrics.bottom}",
                     it.baseline + metrics.bottom <= it.height,
                 )
             }
