@@ -113,10 +113,15 @@ class WidgetConfigActivity : ComponentActivity() {
                                 val result = WidgetConfigurationCommitter(
                                     container.widgets,
                                     container.widgetInstanceUpdater,
+                                    ownsWidget = ::ownsWidget,
                                 ).commit(appWidgetId, selectedId, display)
                                 val decision = WidgetConfigSaveDecision.from(selectedId, result)
                                 selectedId = decision.selectedId
                                 saveError = decision.error
+                                if (decision.cancelActivity) {
+                                    finish()
+                                    return@launch
+                                }
                                 if (!decision.completed) {
                                     return@launch
                                 }

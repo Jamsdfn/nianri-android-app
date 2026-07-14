@@ -8,6 +8,7 @@ import com.nianri.app.data.WidgetRepository
 import com.nianri.app.data.WidgetResolution
 import com.nianri.app.domain.WidgetUpdater
 import com.nianri.app.domain.model.CalendarSystem
+import kotlinx.coroutines.CancellationException
 
 fun interface WidgetInstanceUpdater {
     suspend fun update(appWidgetId: Int)
@@ -38,12 +39,14 @@ class AndroidWidgetInstanceUpdater(
 sealed interface WidgetConfigurationResult {
     data object Saved : WidgetConfigurationResult
     data object MissingDay : WidgetConfigurationResult
+    data object NotOwned : WidgetConfigurationResult
 }
 
 data class WidgetConfigSaveDecision(
     val completed: Boolean,
     val selectedId: Long,
     val error: String?,
+    val cancelActivity: Boolean,
 ) {
     companion object {
         fun from(
@@ -54,11 +57,19 @@ data class WidgetConfigSaveDecision(
                 completed = true,
                 selectedId = selectedId,
                 error = null,
+                cancelActivity = false,
             )
             WidgetConfigurationResult.MissingDay -> WidgetConfigSaveDecision(
                 completed = false,
                 selectedId = 0L,
                 error = "这个日子刚刚被删除，请重新选择",
+                cancelActivity = false,
+            )
+            WidgetConfigurationResult.NotOwned -> WidgetConfigSaveDecision(
+                completed = false,
+                selectedId = 0L,
+                error = null,
+                cancelActivity = true,
             )
         }
     }
@@ -67,14 +78,20 @@ data class WidgetConfigSaveDecision(
 class WidgetConfigurationCommitter(
     private val widgets: WidgetRepository,
     private val updater: WidgetInstanceUpdater,
+    private val ownsWidget: (Int) -> Boolean = { true },
 ) {
     suspend fun commit(
         appWidgetId: Int,
         dayId: Long,
         display: CalendarSystem,
     ): WidgetConfigurationResult {
+        if (!ownsWidget(appWidgetId)) return WidgetConfigurationResult.NotOwned
         if (!widgets.selectExistingDay(appWidgetId, dayId, display)) {
             return WidgetConfigurationResult.MissingDay
+        }
+        if (!ownsWidget(appWidgetId)) {
+            widgets.remove(appWidgetId)
+            return WidgetConfigurationResult.NotOwned
         }
         updater.update(appWidgetId)
         return WidgetConfigurationResult.Saved
@@ -86,8 +103,25 @@ class ConfiguredWidgetUpdater(
     private val instanceUpdater: WidgetInstanceUpdater,
 ) : WidgetUpdater {
     override suspend fun updateAll() {
-        widgets.configuredWidgetIds().forEach { instanceUpdater.update(it) }
+        updateWidgetInstances(widgets.configuredWidgetIds(), instanceUpdater::update)
     }
+}
+
+suspend fun updateWidgetInstances(
+    appWidgetIds: List<Int>,
+    update: suspend (Int) -> Unit,
+) {
+    var failure: Exception? = null
+    appWidgetIds.forEach { appWidgetId ->
+        try {
+            update(appWidgetId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (failure == null) failure = error else failure.addSuppressed(error)
+        }
+    }
+    failure?.let { throw it }
 }
 
 class WidgetToggleController(

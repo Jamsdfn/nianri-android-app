@@ -34,8 +34,23 @@ class WidgetProviderMetadataTest {
         assertTrue(manifest.contains("android:resource=\"@xml/nianri_wide_widget_info\""))
         assertTrue(manifest.contains("android:resource=\"@xml/nianri_square_widget_info\""))
         assertTrue(manifest.contains("android:label=\"@string/app_name\""))
+        assertTrue(
+            Regex("NianriWideWidgetReceiver[\\s\\S]{0,100}android:exported=\"false\"").containsMatchIn(manifest),
+        )
+        assertTrue(
+            Regex("NianriSquareWidgetReceiver[\\s\\S]{0,100}android:exported=\"false\"").containsMatchIn(manifest),
+        )
         assertTrue(Regex("WidgetConfigActivity[\\s\\S]{0,100}android:exported=\"true\"").containsMatchIn(manifest))
         assertFalse(manifest.contains("android:label=\"念日\""))
+    }
+
+    @Test
+    fun `initial layout is a neutral background without an internal app label`() {
+        val xml = File("src/main/res/layout/nianri_widget_loading.xml").readText()
+
+        assertFalse(xml.contains("android:text="))
+        assertFalse(xml.contains("@string/app_name"))
+        assertTrue(xml.contains("@drawable/widget_night_background"))
     }
 
     private fun assertCommonMetadata(xml: String) {

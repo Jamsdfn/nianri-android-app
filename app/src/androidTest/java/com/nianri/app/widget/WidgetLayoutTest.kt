@@ -1,8 +1,13 @@
 package com.nianri.app.widget
 
 import android.content.Context
+import android.content.ComponentName
+import android.content.res.Configuration
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetHost
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -15,15 +20,19 @@ import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.nianri.app.NianriApplication
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.ImportantDay
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -121,6 +130,50 @@ class WidgetLayoutTest {
     }
 
     @Test
+    fun privateReceiverDeletionLifecycleStillCleansItsInstance() = runBlocking {
+        val container = (context as NianriApplication).container
+        container.database.clearAllTables()
+        val dayId = container.importantDays.save(
+            ImportantDay(
+                name = "接收器清理",
+                basis = CalendarSystem.SOLAR,
+                month = 8,
+                day = 6,
+                appDisplay = CalendarSystem.SOLAR,
+            ),
+        )
+        val host = AppWidgetHost(context, 9_904)
+        val manager = AppWidgetManager.getInstance(context)
+        val uiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        uiAutomation.adoptShellPermissionIdentity(android.Manifest.permission.BIND_APPWIDGET)
+        val appWidgetId = host.allocateAppWidgetId()
+        try {
+            assertTrue(
+                manager.bindAppWidgetIdIfAllowed(
+                    appWidgetId,
+                    ComponentName(context, NianriWideWidgetReceiver::class.java),
+                ),
+            )
+            container.widgets.select(appWidgetId, dayId, CalendarSystem.SOLAR)
+
+            host.deleteAppWidgetId(appWidgetId)
+
+            withTimeout(3_000) {
+                while (
+                    container.widgets.resolve(appWidgetId) !is com.nianri.app.data.WidgetResolution.Unconfigured
+                ) {
+                    delay(25)
+                }
+            }
+        } finally {
+            runCatching { host.deleteAppWidgetId(appWidgetId) }
+            host.stopListening()
+            uiAutomation.dropShellPermissionIdentity()
+        }
+        container.database.clearAllTables()
+    }
+
+    @Test
     fun unicodeDiagnosticComparesPlatformRemoteViewsWithGlance() = runBlocking {
         val expected = "中文 ↻ 23天"
         val platform = RemoteViews(context.packageName, android.R.layout.simple_list_item_1).apply {
@@ -155,17 +208,89 @@ class WidgetLayoutTest {
         saveRender(square, "square-reference-356x356px.png")
     }
 
+    @Test
+    fun minimumWidgetsRemainReadableAtLargeSystemFontScales() = runBlocking {
+        listOf(1.15f, 1.3f, 2.0f).forEach { fontScale ->
+            val wide = render(DpSize(110.dp, 40.dp), wide = true, model = content, fontScale = fontScale)
+            val square = render(DpSize(110.dp, 110.dp), wide = false, model = content, fontScale = fontScale)
+            val wideTexts = wide.textViews().map { it.text.toString() }
+            val squareTexts = square.textViews().map { it.text.toString() }
+
+            assertTrue("wide days at $fontScale: $wideTexts", "23天" in wideTexts)
+            assertTrue("wide date at $fontScale: $wideTexts", wideTexts.any { "8/6" in it })
+            assertTrue("square days at $fontScale: $squareTexts", "23天" in squareTexts)
+            assertTrue("square date at $fontScale: $squareTexts", squareTexts.any { "8月6日" in it })
+            assertChildrenInside(wide, verticalSafetyDp = 1, requireFontBox = true)
+            assertChildrenInside(square, verticalSafetyDp = 1, requireFontBox = true)
+
+            if (fontScale == 2.0f) {
+                saveRender(wide, "wide-font-scale-2.0-110x40dp.png")
+                saveRender(square, "square-font-scale-2.0-110x110dp.png")
+            }
+        }
+    }
+
+    @Test
+    fun recoveryWidgetsRemainReadableAtMaximumFontScale() = runBlocking {
+        val unconfigured = render(
+            DpSize(110.dp, 40.dp),
+            wide = true,
+            model = WidgetModel.Unconfigured,
+            fontScale = 2f,
+        )
+        val missing = render(
+            DpSize(110.dp, 40.dp),
+            wide = true,
+            model = WidgetModel.MissingDay,
+            fontScale = 2f,
+        )
+        val unavailable = render(
+            DpSize(110.dp, 110.dp),
+            wide = false,
+            model = WidgetModel.DateUnavailable(99, "妈妈生日", "按农历", CalendarSystem.SOLAR),
+            fontScale = 2f,
+        )
+
+        assertChildrenInside(unconfigured, verticalSafetyDp = 1, requireFontBox = true)
+        assertChildrenInside(missing, verticalSafetyDp = 1, requireFontBox = true)
+        assertChildrenInside(unavailable, verticalSafetyDp = 1, requireFontBox = true)
+        assertTrue(missing.textViews().any { it.text.toString() == "这个日子已删除" })
+        assertTrue(unavailable.textViews().any { it.text.toString() == "日期暂不可用" })
+    }
+
+    @Test
+    fun fullCardBackgroundOpensDetailWhileDateRegionKeepsItsOwnClickTarget() = runBlocking {
+        listOf(true to DpSize(110.dp, 40.dp), false to DpSize(110.dp, 110.dp)).forEach { (wide, size) ->
+            val view = render(size, wide = wide, model = content)
+            val fullBounds = Rect(0, 0, view.measuredWidth, view.measuredHeight)
+            val fullCardTarget = view.allViews().firstOrNull {
+                it.hasOnClickListeners() && it.boundsIn(view) == fullBounds
+            }
+            val dateText = view.textViews().first { "↻" in it.text.toString() }
+            val dateTarget = dateText.closestClickableAncestor()
+
+            assertNotNull("${if (wide) "wide" else "square"} background lacks full-card click", fullCardTarget)
+            assertNotNull("date control lacks click target", dateTarget)
+            assertNotEquals("date callback must override the background detail action", fullCardTarget, dateTarget)
+            assertTrue("date target must be smaller than the whole card", dateTarget!!.boundsIn(view) != fullBounds)
+        }
+    }
+
     private suspend fun render(
         size: DpSize,
         wide: Boolean,
         model: WidgetModel,
         exactPixels: Pair<Int, Int>? = null,
+        fontScale: Float = 1.0f,
     ): View {
-        val remoteViews = GlanceRemoteViews().compose(context, size) {
-            NianriWidgetSurface(context, 900, model, wide)
+        val renderContext = context.createConfigurationContext(
+            Configuration(context.resources.configuration).apply { this.fontScale = fontScale },
+        )
+        val remoteViews = GlanceRemoteViews().compose(renderContext, size) {
+            NianriWidgetSurface(renderContext, 900, model, wide)
         }.remoteViews
-        val root = FrameLayout(context)
-        val view = remoteViews.apply(context, root)
+        val root = FrameLayout(renderContext)
+        val view = remoteViews.apply(renderContext, root)
         val width = exactPixels?.first ?: px(size.width.value.toInt())
         val height = exactPixels?.second ?: px(size.height.value.toInt())
         view.measure(
@@ -219,6 +344,35 @@ class WidgetLayoutTest {
             if (view is ViewGroup) (0 until view.childCount).forEach { visit(view.getChildAt(it)) }
         }
         visit(this@textViews)
+    }
+
+    private fun View.allViews(): List<View> = buildList {
+        fun visit(view: View) {
+            add(view)
+            if (view is ViewGroup) (0 until view.childCount).forEach { visit(view.getChildAt(it)) }
+        }
+        visit(this@allViews)
+    }
+
+    private fun View.closestClickableAncestor(): View? {
+        var candidate: View? = this
+        while (candidate != null) {
+            if (candidate.hasOnClickListeners()) return candidate
+            candidate = candidate.parent as? View
+        }
+        return null
+    }
+
+    private fun View.boundsIn(root: View): Rect {
+        var globalLeft = left
+        var globalTop = top
+        var ancestor = parent
+        while (ancestor is View && ancestor !== root) {
+            globalLeft += ancestor.left
+            globalTop += ancestor.top
+            ancestor = ancestor.parent
+        }
+        return Rect(globalLeft, globalTop, globalLeft + width, globalTop + height)
     }
 
     private fun List<TextView>.diagnostic(): String = joinToString(prefix = "RemoteViews text nodes: [", postfix = "]") {

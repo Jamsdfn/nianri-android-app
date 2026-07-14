@@ -38,6 +38,7 @@ internal fun NianriWidgetSurface(
     model: WidgetModel,
     wide: Boolean,
 ) {
+    val fontScale = context.resources.configuration.fontScale.coerceAtLeast(1f)
     val modifier = GlanceModifier
         .fillMaxSize()
         .background(ImageProvider(R.drawable.widget_night_background))
@@ -49,6 +50,7 @@ internal fun NianriWidgetSurface(
             title = "选择一个重要日子",
             action = actionStartActivity(WidgetActionIntents.configuration(context, appWidgetId)),
             wide = wide,
+            fontScale = fontScale,
         )
         WidgetModel.MissingDay -> RecoverySurface(
             modifier = modifier,
@@ -56,6 +58,7 @@ internal fun NianriWidgetSurface(
             subtitle = WidgetTextContract.missingRows[1],
             action = actionStartActivity(WidgetActionIntents.configuration(context, appWidgetId)),
             wide = wide,
+            fontScale = fontScale,
         )
         is WidgetModel.DateUnavailable -> RecoverySurface(
             modifier = modifier,
@@ -63,6 +66,7 @@ internal fun NianriWidgetSurface(
             subtitle = "点按编辑这个日子",
             action = actionStartActivity(WidgetActionIntents.edit(context, model.id)),
             wide = wide,
+            fontScale = fontScale,
         )
         is WidgetModel.Content -> if (wide) {
             WideContent(context, model, modifier)
@@ -76,24 +80,32 @@ internal fun NianriWidgetSurface(
 private fun WideContent(context: Context, model: WidgetModel.Content, modifier: GlanceModifier) {
     val text = WidgetTextContract.wide(model)
     val detailAction = actionStartActivity(WidgetActionIntents.detail(context, model.id))
+    val fontScale = context.resources.configuration.fontScale.coerceAtLeast(1f)
+    val basisText = when {
+        fontScale >= 2f -> ""
+        fontScale >= 1.3f -> text.rows[1].leading.removePrefix("按")
+        else -> text.rows[1].leading
+    }
     Column(
-        modifier = modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+        modifier = modifier
+            .clickable(detailAction)
+            .padding(horizontal = 7.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
-            modifier = GlanceModifier.fillMaxWidth().clickable(detailAction),
+            modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text.rows[0].leading,
                 modifier = GlanceModifier.defaultWeight(),
-                style = TextStyle(PrimaryText, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                style = TextStyle(PrimaryText, fontSize = cappedSp(12f, fontScale, 1f), fontWeight = FontWeight.Medium),
                 maxLines = 1,
             )
             Spacer(GlanceModifier.width(4.dp))
             Text(
                 text.rows[0].trailing,
-                style = TextStyle(CountdownText, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                style = TextStyle(CountdownText, fontSize = cappedSp(16f, fontScale, 1f), fontWeight = FontWeight.Bold),
                 maxLines = 1,
             )
         }
@@ -101,17 +113,22 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
             modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text.rows[1].leading,
-                modifier = GlanceModifier.clickable(detailAction),
-                style = TextStyle(SecondaryText, fontSize = 8.5.sp),
-                maxLines = 1,
-            )
+            if (basisText.isNotEmpty()) {
+                Text(
+                    basisText,
+                    style = TextStyle(SecondaryText, fontSize = cappedSp(8.5f, fontScale, 1f)),
+                    maxLines = 1,
+                )
+            }
             Spacer(GlanceModifier.defaultWeight())
             Text(
                 text.rows[1].trailing,
                 modifier = GlanceModifier.clickable(actionRunCallback<ToggleWidgetCalendarAction>()),
-                style = TextStyle(PrimaryText, fontSize = 8.5.sp, fontWeight = FontWeight.Medium),
+                style = TextStyle(
+                    PrimaryText,
+                    fontSize = cappedSp(8.5f, fontScale, 1f),
+                    fontWeight = FontWeight.Medium,
+                ),
                 maxLines = 1,
             )
         }
@@ -122,42 +139,48 @@ private fun WideContent(context: Context, model: WidgetModel.Content, modifier: 
 private fun SquareContent(context: Context, model: WidgetModel.Content, modifier: GlanceModifier) {
     val text = WidgetTextContract.square(model)
     val detailAction = actionStartActivity(WidgetActionIntents.detail(context, model.id))
+    val fontScale = context.resources.configuration.fontScale.coerceAtLeast(1f)
     Column(
-        modifier = modifier.padding(10.dp),
+        modifier = modifier.clickable(detailAction).padding(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
         Text(
             text.name,
-            modifier = GlanceModifier.fillMaxWidth().clickable(detailAction),
-            style = TextStyle(PrimaryText, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+            modifier = GlanceModifier.fillMaxWidth(),
+            style = TextStyle(PrimaryText, fontSize = cappedSp(13f, fontScale, 1.15f), fontWeight = FontWeight.Medium),
             maxLines = 1,
         )
         Text(
             text.basis,
-            modifier = GlanceModifier.fillMaxWidth().clickable(detailAction),
-            style = TextStyle(SecondaryText, fontSize = 9.sp),
+            modifier = GlanceModifier.fillMaxWidth(),
+            style = TextStyle(SecondaryText, fontSize = cappedSp(9f, fontScale, 1.15f)),
             maxLines = 1,
         )
         Spacer(GlanceModifier.height(2.dp))
         Text(
             text.days,
-            modifier = GlanceModifier.fillMaxWidth().clickable(detailAction),
-            style = TextStyle(CountdownText, fontSize = 28.sp, fontWeight = FontWeight.Bold),
+            modifier = GlanceModifier.fillMaxWidth(),
+            style = TextStyle(CountdownText, fontSize = cappedSp(28f, fontScale, 1.15f), fontWeight = FontWeight.Bold),
             maxLines = 1,
         )
         Spacer(GlanceModifier.defaultWeight())
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text.dateLabel,
-                modifier = GlanceModifier.clickable(detailAction),
-                style = TextStyle(SecondaryText, fontSize = 9.sp),
-                maxLines = 1,
-            )
+            if (fontScale == 1f) {
+                Text(
+                    text.dateLabel,
+                    style = TextStyle(SecondaryText, fontSize = 9.sp),
+                    maxLines = 1,
+                )
+            }
             Spacer(GlanceModifier.defaultWeight())
             Text(
                 text.dateControl,
                 modifier = GlanceModifier.clickable(actionRunCallback<ToggleWidgetCalendarAction>()),
-                style = TextStyle(PrimaryText, fontSize = 9.sp, fontWeight = FontWeight.Medium),
+                style = TextStyle(
+                    PrimaryText,
+                    fontSize = cappedSp(9f, fontScale, 1.15f),
+                    fontWeight = FontWeight.Medium,
+                ),
                 maxLines = 1,
             )
         }
@@ -170,6 +193,7 @@ private fun RecoverySurface(
     title: String,
     action: androidx.glance.action.Action,
     wide: Boolean,
+    fontScale: Float,
     subtitle: String? = null,
 ) {
     Column(
@@ -181,15 +205,29 @@ private fun RecoverySurface(
     ) {
         Text(
             title,
-            style = TextStyle(PrimaryText, fontSize = if (wide) 11.sp else 13.sp, fontWeight = FontWeight.Medium),
+            style = TextStyle(
+                PrimaryText,
+                fontSize = cappedSp(if (wide) 11f else 13f, fontScale, if (wide) 1f else 1.15f),
+                fontWeight = FontWeight.Medium,
+            ),
             maxLines = 1,
         )
         if (subtitle != null) {
             Text(
                 subtitle,
-                style = TextStyle(CountdownText, fontSize = if (wide) 9.sp else 10.sp),
+                style = TextStyle(
+                    CountdownText,
+                    fontSize = cappedSp(if (wide) 9f else 10f, fontScale, if (wide) 1f else 1.15f),
+                ),
                 maxLines = 1,
             )
         }
     }
 }
+
+/**
+ * Launcher cells have fixed physical bounds, so widget text scales only to a safe per-size cap.
+ * Core name/countdown/date remain visible; the wide basis helper compacts before core content.
+ */
+private fun cappedSp(baseSp: Float, systemFontScale: Float, maximumEffectiveScale: Float) =
+    (baseSp * minOf(1f, maximumEffectiveScale / systemFontScale)).sp

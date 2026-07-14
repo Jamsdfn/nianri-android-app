@@ -23,7 +23,7 @@
             android:exported="true" />
         <receiver
             android:name=".widget.NianriWideWidgetReceiver"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -34,7 +34,7 @@
         </receiver>
         <receiver
             android:name=".widget.NianriSquareWidgetReceiver"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

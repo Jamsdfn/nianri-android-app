@@ -205,6 +205,25 @@ class RepositoryTest {
     }
 
     @Test
+    fun configurationCommitCleansPreferenceWhenLauncherDeletesWidgetDuringCommit() = runBlocking {
+        val dayId = days.save(day(name = "提交中被移除"))
+        val updated = mutableListOf<Int>()
+        var ownershipChecks = 0
+        val committer = WidgetConfigurationCommitter(
+            widgets = widgets,
+            updater = WidgetInstanceUpdater { updated += it },
+            ownsWidget = { ++ownershipChecks == 1 },
+        )
+
+        val result = committer.commit(214, dayId, CalendarSystem.SOLAR)
+
+        assertEquals(WidgetConfigurationResult.NotOwned, result)
+        assertTrue(widgets.resolve(214) is WidgetResolution.Unconfigured)
+        assertTrue(updated.isEmpty())
+        assertEquals(2, ownershipChecks)
+    }
+
+    @Test
     fun toggleControllerChangesAndUpdatesOnlyTheRequestedWidget() = runBlocking {
         val dayId = days.save(day(name = "纪念日"))
         widgets.select(301, dayId, CalendarSystem.SOLAR)
@@ -248,6 +267,29 @@ class RepositoryTest {
         updater.updateAll()
 
         assertEquals(listOf(321, 322), updated.sorted())
+    }
+
+    @Test
+    fun configuredUpdaterContinuesToLaterInstancesAfterOneProviderFailure() = runBlocking {
+        val dayId = days.save(day(name = "批量刷新"))
+        widgets.select(323, dayId, CalendarSystem.SOLAR)
+        widgets.select(324, dayId, CalendarSystem.LUNAR)
+        val updated = mutableListOf<Int>()
+        val updater = ConfiguredWidgetUpdater(
+            widgets,
+            WidgetInstanceUpdater { id ->
+                updated += id
+                if (id == 323) error("provider failed")
+            },
+        )
+
+        try {
+            updater.updateAll()
+        } catch (_: IllegalStateException) {
+            // The aggregate is intentionally returned after every instance is attempted.
+        }
+
+        assertEquals(listOf(323, 324), updated)
     }
 
 
