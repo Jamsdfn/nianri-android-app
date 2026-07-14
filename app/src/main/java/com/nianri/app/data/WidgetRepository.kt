@@ -1,5 +1,6 @@
 package com.nianri.app.data
 
+import androidx.room.withTransaction
 import com.nianri.app.data.local.NianriDatabase
 import com.nianri.app.data.local.WidgetPreferenceEntity
 import com.nianri.app.domain.model.CalendarSystem
@@ -26,6 +27,16 @@ class WidgetRepository(private val database: NianriDatabase) {
         display: CalendarSystem,
     ) {
         preferences.upsert(WidgetPreferenceEntity(appWidgetId, importantDayId, display))
+    }
+
+    suspend fun selectExistingDay(
+        appWidgetId: Int,
+        importantDayId: Long,
+        display: CalendarSystem,
+    ): Boolean = database.withTransaction {
+        if (database.importantDayDao().get(importantDayId) == null) return@withTransaction false
+        preferences.upsert(WidgetPreferenceEntity(appWidgetId, importantDayId, display))
+        true
     }
 
     suspend fun toggleDisplay(appWidgetId: Int): CalendarSystem? {

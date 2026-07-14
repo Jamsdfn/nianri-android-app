@@ -26,6 +26,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,18 +68,27 @@ class WidgetConfigActivity : ComponentActivity() {
             setContent {
                 val days by container.importantDays.observeAll()
                     .collectAsStateWithLifecycle(initialValue = emptyList())
+                var selectedId by remember(configured?.day?.id) {
+                    mutableLongStateOf(configured?.day?.id ?: 0L)
+                }
+                var saveError by remember { mutableStateOf<String?>(null) }
                 NianriTheme {
                     WidgetConfigScreen(
                         days = days,
-                        initialSelection = configured?.day?.id,
+                        selectedId = selectedId,
                         missingSelection = resolution is WidgetResolution.MissingDay,
+                        saveError = saveError,
+                        onSelection = {
+                            selectedId = it
+                            saveError = null
+                        },
                         onCreateDay = {
                             startActivity(
                                 Intent(this@WidgetConfigActivity, MainActivity::class.java)
                                     .putExtra(MainActivity.EXTRA_OPEN_NEW_DAY, true),
                             )
                         },
-                        onSave = save@{ selectedId ->
+                        onSave = save@{
                             val selected = days.firstOrNull { it.id == selectedId }
                                 ?: return@save
                             lifecycleScope.launch {
@@ -87,8 +97,16 @@ class WidgetConfigActivity : ComponentActivity() {
                                 } else {
                                     selected.appDisplay
                                 }
-                                container.widgets.select(appWidgetId, selectedId, display)
-                                container.widgetInstanceUpdater.update(appWidgetId)
+                                val result = WidgetConfigurationCommitter(
+                                    container.widgets,
+                                    container.widgetInstanceUpdater,
+                                ).commit(appWidgetId, selectedId, display)
+                                val decision = WidgetConfigSaveDecision.from(selectedId, result)
+                                selectedId = decision.selectedId
+                                saveError = decision.error
+                                if (!decision.completed) {
+                                    return@launch
+                                }
                                 setResult(
                                     Activity.RESULT_OK,
                                     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
@@ -107,12 +125,13 @@ class WidgetConfigActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 private fun WidgetConfigScreen(
     days: List<ImportantDay>,
-    initialSelection: Long?,
+    selectedId: Long,
     missingSelection: Boolean,
+    saveError: String?,
+    onSelection: (Long) -> Unit,
     onCreateDay: () -> Unit,
-    onSave: (Long) -> Unit,
+    onSave: () -> Unit,
 ) {
-    var selectedId by remember(initialSelection) { mutableLongStateOf(initialSelection ?: 0L) }
     Scaffold(
         topBar = { TopAppBar(title = { Text("选择重要日子") }) },
     ) { padding ->
@@ -139,6 +158,9 @@ private fun WidgetConfigScreen(
                 if (missingSelection) {
                     Text("原来选择的日子已删除，请重新选择", modifier = Modifier.padding(vertical = 12.dp))
                 }
+                if (saveError != null) {
+                    Text(saveError, modifier = Modifier.padding(vertical = 12.dp))
+                }
                 Text(
                     "每个小部件独立选择；日期展示切换不改变倒计时基准。",
                     modifier = Modifier.padding(vertical = 12.dp),
@@ -151,13 +173,13 @@ private fun WidgetConfigScreen(
                                 .fillMaxWidth()
                                 .testTag("widget-day-${day.id}")
                                 .semantics { this.selected = selected }
-                                .clickable { selectedId = day.id }
+                                .clickable { onSelection(day.id) }
                                 .padding(vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(
                                 selected = selected,
-                                onClick = { selectedId = day.id },
+                                onClick = { onSelection(day.id) },
                                 modifier = Modifier.semantics { this.selected = selected },
                             )
                             Column(modifier = Modifier.padding(start = 12.dp)) {
@@ -173,7 +195,7 @@ private fun WidgetConfigScreen(
                     }
                 }
                 Button(
-                    onClick = { onSave(selectedId) },
+                    onClick = onSave,
                     enabled = days.any { it.id == selectedId },
                     modifier = Modifier
                         .fillMaxWidth()

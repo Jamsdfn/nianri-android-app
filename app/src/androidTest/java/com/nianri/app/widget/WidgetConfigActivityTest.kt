@@ -86,7 +86,7 @@ class WidgetConfigActivityTest {
     @Test
     fun reconfigurationReplacesSelectionWithoutDeletingWidgetPreference() = runBlocking {
         val first = container.importantDays.save(day("原日子", CalendarSystem.SOLAR, CalendarSystem.SOLAR))
-        val second = container.importantDays.save(day("新日子", CalendarSystem.LUNAR, CalendarSystem.LUNAR))
+        val second = container.importantDays.save(day("新日子", CalendarSystem.LUNAR, CalendarSystem.SOLAR))
         container.widgets.select(403, first, CalendarSystem.LUNAR)
         val scenario = ActivityScenario.launchActivityForResult<WidgetConfigActivity>(intent(403))
 
@@ -97,10 +97,27 @@ class WidgetConfigActivityTest {
 
         assertEquals(Activity.RESULT_OK, scenario.result.resultCode)
         assertEquals(
-            WidgetResolution.Configured(container.importantDays.get(second)!!, CalendarSystem.LUNAR),
+            WidgetResolution.Configured(container.importantDays.get(second)!!, CalendarSystem.SOLAR),
             container.widgets.resolve(403),
         )
         assertEquals(listOf(403), container.widgets.configuredWidgetIds())
+    }
+
+    @Test
+    fun reconfiguringTheSameDayKeepsItsIndependentDisplay() = runBlocking {
+        val dayId = container.importantDays.save(day("同一个日子", CalendarSystem.SOLAR, CalendarSystem.SOLAR))
+        container.widgets.select(408, dayId, CalendarSystem.LUNAR)
+        val scenario = ActivityScenario.launchActivityForResult<WidgetConfigActivity>(intent(408))
+
+        waitForText("同一个日子")
+        compose.onNodeWithTag("widget-day-$dayId").assertIsSelected()
+        compose.onNodeWithTag("widget-config-save").performClick()
+
+        assertEquals(Activity.RESULT_OK, scenario.result.resultCode)
+        assertEquals(
+            WidgetResolution.Configured(container.importantDays.get(dayId)!!, CalendarSystem.LUNAR),
+            container.widgets.resolve(408),
+        )
     }
 
     @Test

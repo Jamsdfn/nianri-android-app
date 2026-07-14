@@ -9,6 +9,8 @@ import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.widget.ConfiguredWidgetUpdater
 import com.nianri.app.widget.WidgetInstanceUpdater
 import com.nianri.app.widget.WidgetToggleController
+import com.nianri.app.widget.WidgetConfigurationCommitter
+import com.nianri.app.widget.WidgetConfigurationResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -162,6 +164,44 @@ class RepositoryTest {
             WidgetResolution.Configured(days.get(dayId)!!, CalendarSystem.LUNAR),
             widgets.resolve(202),
         )
+    }
+
+    @Test
+    fun selectingExistingDayAtomicallyRejectsADeletedRecord() = runBlocking {
+        val dayId = days.save(day(name = "保存前删除"))
+        days.delete(dayId)
+
+        val selected = widgets.selectExistingDay(211, dayId, CalendarSystem.SOLAR)
+
+        assertEquals(false, selected)
+        assertTrue(widgets.resolve(211) is WidgetResolution.Unconfigured)
+    }
+
+    @Test
+    fun selectingExistingDayAtomicallyPersistsAStillExistingRecord() = runBlocking {
+        val dayId = days.save(day(name = "仍然存在"))
+
+        val selected = widgets.selectExistingDay(212, dayId, CalendarSystem.LUNAR)
+
+        assertEquals(true, selected)
+        assertEquals(
+            WidgetResolution.Configured(days.get(dayId)!!, CalendarSystem.LUNAR),
+            widgets.resolve(212),
+        )
+    }
+
+    @Test
+    fun configurationCommitRejectedAfterClickedDayIsDeletedDoesNotUpdateWidget() = runBlocking {
+        val dayId = days.save(day(name = "点击后删除"))
+        val updated = mutableListOf<Int>()
+        val committer = WidgetConfigurationCommitter(widgets, WidgetInstanceUpdater { updated += it })
+        days.delete(dayId)
+
+        val result = committer.commit(213, dayId, CalendarSystem.SOLAR)
+
+        assertEquals(WidgetConfigurationResult.MissingDay, result)
+        assertTrue(widgets.resolve(213) is WidgetResolution.Unconfigured)
+        assertTrue(updated.isEmpty())
     }
 
     @Test
