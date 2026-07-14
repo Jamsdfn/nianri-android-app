@@ -14,6 +14,7 @@ class MainActivity : ComponentActivity() {
         val importantDayId = intent
             .takeIf { it.hasExtra(EXTRA_IMPORTANT_DAY_ID) }
             ?.getLongExtra(EXTRA_IMPORTANT_DAY_ID, 0L)
+        val openNewDay = intent.getBooleanExtra(EXTRA_OPEN_NEW_DAY, false)
         val uiPreferences = UiPreferences(this)
         setContent {
             NianriTheme {
@@ -21,6 +22,7 @@ class MainActivity : ComponentActivity() {
                     container = application.container,
                     uiPreferences = uiPreferences,
                     importantDayId = importantDayId,
+                    openNewDay = openNewDay,
                 )
             }
         }
@@ -28,5 +30,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_IMPORTANT_DAY_ID = "importantDayId"
+        const val EXTRA_OPEN_NEW_DAY = "openNewDay"
     }
 }

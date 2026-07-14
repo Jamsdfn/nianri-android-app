@@ -32,10 +32,15 @@ fun NianriNavHost(
     container: AppContainer,
     uiPreferences: UiPreferences,
     importantDayId: Long? = null,
+    openNewDay: Boolean = false,
 ) {
     val navController = rememberNavController()
-    val startDestination = remember(importantDayId) {
-        importantDayId?.let { "detail/$it" } ?: "home"
+    val startDestination = remember(importantDayId, openNewDay) {
+        when {
+            importantDayId != null -> "detail/$importantDayId"
+            openNewDay -> "edit?dayId=0"
+            else -> "home"
+        }
     }
     fun navigateHomeClearingStack() {
         navController.navigate("home") {

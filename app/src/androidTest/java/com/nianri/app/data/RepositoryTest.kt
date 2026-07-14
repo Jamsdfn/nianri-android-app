@@ -6,6 +6,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.nianri.app.data.local.NianriDatabase
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.ImportantDay
+import com.nianri.app.widget.ConfiguredWidgetUpdater
+import com.nianri.app.widget.WidgetInstanceUpdater
+import com.nianri.app.widget.WidgetToggleController
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -145,6 +148,68 @@ class RepositoryTest {
         assertEquals(1, widgets.countReferences(dayId))
         assertTrue(widgets.resolve(100) is WidgetResolution.Unconfigured)
     }
+
+    @Test
+    fun removingWidgetDeletesOnlyThatWidgetPreference() = runBlocking {
+        val dayId = days.save(day(name = "纪念日"))
+        widgets.select(201, dayId, CalendarSystem.SOLAR)
+        widgets.select(202, dayId, CalendarSystem.LUNAR)
+
+        widgets.remove(201)
+
+        assertTrue(widgets.resolve(201) is WidgetResolution.Unconfigured)
+        assertEquals(
+            WidgetResolution.Configured(days.get(dayId)!!, CalendarSystem.LUNAR),
+            widgets.resolve(202),
+        )
+    }
+
+    @Test
+    fun toggleControllerChangesAndUpdatesOnlyTheRequestedWidget() = runBlocking {
+        val dayId = days.save(day(name = "纪念日"))
+        widgets.select(301, dayId, CalendarSystem.SOLAR)
+        widgets.select(302, dayId, CalendarSystem.LUNAR)
+        val updated = mutableListOf<Int>()
+        val controller = WidgetToggleController(widgets, WidgetInstanceUpdater(updated::add))
+
+        controller.toggle(301)
+
+        assertEquals(CalendarSystem.LUNAR, (widgets.resolve(301) as WidgetResolution.Configured).display)
+        assertEquals(CalendarSystem.LUNAR, (widgets.resolve(302) as WidgetResolution.Configured).display)
+        assertEquals(listOf(301), updated)
+    }
+
+    @Test
+    fun toggleControllerSafelyIgnoresUnconfiguredAndMissingWidgets() = runBlocking {
+        val dayId = days.save(day(name = "删除日"))
+        widgets.select(312, dayId, CalendarSystem.SOLAR)
+        days.delete(dayId)
+        val updated = mutableListOf<Int>()
+        val controller = WidgetToggleController(widgets, WidgetInstanceUpdater(updated::add))
+
+        controller.toggle(311)
+        controller.toggle(312)
+
+        assertTrue(widgets.resolve(311) is WidgetResolution.Unconfigured)
+        assertTrue(widgets.resolve(312) is WidgetResolution.MissingDay)
+        assertTrue(updated.isEmpty())
+    }
+
+    @Test
+    fun configuredUpdaterRefreshesEveryStoredWidgetIncludingMissingReferences() = runBlocking {
+        val present = days.save(day(name = "仍存在"))
+        val deleted = days.save(day(name = "将删除"))
+        widgets.select(321, present, CalendarSystem.SOLAR)
+        widgets.select(322, deleted, CalendarSystem.LUNAR)
+        days.delete(deleted)
+        val updated = mutableListOf<Int>()
+        val updater = ConfiguredWidgetUpdater(widgets, WidgetInstanceUpdater(updated::add))
+
+        updater.updateAll()
+
+        assertEquals(listOf(321, 322), updated.sorted())
+    }
+
 
     @Test(expected = IllegalArgumentException::class)
     fun saveRejectsBlankName() {

@@ -8,11 +8,13 @@ import com.nianri.app.data.local.NianriDatabase
 import com.nianri.app.domain.DayListProjector
 import com.nianri.app.domain.DayMutationCoordinator
 import com.nianri.app.domain.WidgetUpdater
-import com.nianri.app.domain.WidgetUpdateUnavailableException
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.calendar.IcuCalendarConverter
 import com.nianri.app.reminder.AndroidReminderScheduler
 import com.nianri.app.reminder.ReminderScheduler
+import com.nianri.app.widget.AndroidWidgetInstanceUpdater
+import com.nianri.app.widget.ConfiguredWidgetUpdater
+import com.nianri.app.widget.WidgetInstanceUpdater
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -41,9 +43,10 @@ class AppContainer(context: Context) {
             clock = CurrentSystemZoneClock(),
         )
     }
-    val widgetUpdater: WidgetUpdater by lazy {
-        PreProviderWidgetUpdater(widgets::hasConfiguredWidgets)
+    val widgetInstanceUpdater: WidgetInstanceUpdater by lazy {
+        AndroidWidgetInstanceUpdater(applicationContext)
     }
+    val widgetUpdater: WidgetUpdater by lazy { ConfiguredWidgetUpdater(widgets, widgetInstanceUpdater) }
     val dayListProjector by lazy {
         DayListProjector(
             days = importantDays,
@@ -70,18 +73,4 @@ class CurrentSystemZoneClock(
     override fun withZone(zone: ZoneId): Clock = instantSource.withZone(zone)
 
     override fun instant(): Instant = instantSource.instant()
-}
-
-internal class PreProviderWidgetUpdater(
-    private val hasConfiguredWidgets: suspend () -> Boolean,
-) : WidgetUpdater {
-    override suspend fun prepareMutation() {
-        if (hasConfiguredWidgets()) {
-            throw WidgetUpdateUnavailableException(
-                "已有小部件配置，完成小部件更新能力前不能修改日子",
-            )
-        }
-    }
-
-    override suspend fun updateAll() = Unit
 }

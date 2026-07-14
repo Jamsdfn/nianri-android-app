@@ -17,4 +17,10 @@ interface WidgetPreferenceDao {
 
     @Query("SELECT COUNT(*) FROM widget_preferences")
     suspend fun countAll(): Int
+
+    @Query("SELECT appWidgetId FROM widget_preferences ORDER BY appWidgetId")
+    suspend fun allIds(): List<Int>
+
+    @Query("DELETE FROM widget_preferences WHERE appWidgetId = :id")
+    suspend fun delete(id: Int)
 }

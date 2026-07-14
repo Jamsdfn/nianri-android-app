@@ -47,4 +47,10 @@ class WidgetRepository(private val database: NianriDatabase) {
     suspend fun countReferences(dayId: Long): Int = preferences.countForDay(dayId)
 
     suspend fun hasConfiguredWidgets(): Boolean = preferences.countAll() > 0
+
+    suspend fun configuredWidgetIds(): List<Int> = preferences.allIds()
+
+    suspend fun remove(appWidgetId: Int) {
+        preferences.delete(appWidgetId)
+    }
 }

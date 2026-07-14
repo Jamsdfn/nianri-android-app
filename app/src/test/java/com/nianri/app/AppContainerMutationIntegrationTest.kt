@@ -3,7 +3,6 @@ package com.nianri.app
 import android.app.AlarmManager
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.ImportantDay
-import com.nianri.app.domain.WidgetUpdateUnavailableException
 import com.nianri.app.reminder.ReminderPermissionController
 import com.nianri.app.reminder.ReminderPermissionState
 import com.nianri.app.ui.edit.EditDayViewModel
@@ -17,7 +16,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -55,7 +53,7 @@ class AppContainerMutationIntegrationTest {
         listOf(14, 7, 3).forEach(create::toggleReminder)
 
         create.save()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+        waitForState { create.uiState.value.savedId != null || create.uiState.value.operationError != null }
 
         val savedId = create.uiState.value.savedId
         assertNotNull(savedId)
@@ -63,9 +61,9 @@ class AppContainerMutationIntegrationTest {
         assertNotNull(runBlocking { container.importantDays.get(requireNotNull(savedId)) })
 
         val edit = viewModel(dayId = requireNotNull(savedId))
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+        waitForState { !edit.uiState.value.isLoading }
         edit.delete()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+        waitForState { edit.uiState.value.deleted || edit.uiState.value.operationError != null }
 
         assertTrue(edit.uiState.value.deleted)
         assertNull(edit.uiState.value.operationError)
@@ -73,7 +71,7 @@ class AppContainerMutationIntegrationTest {
     }
 
     @Test
-    fun `pre provider bridge blocks referenced widget mutation before data or alarm side effects`() = runBlocking {
+    fun `real container updates and deletes days referenced by configured widgets`() = runBlocking {
         val id = container.importantDays.save(
             day(name = "原名称").copy(reminders = setOf(14, 7, 3)),
         )
@@ -85,21 +83,13 @@ class AppContainerMutationIntegrationTest {
         val originalAlarmCount = alarms.scheduledAlarms.size
         container.widgets.select(101, id, CalendarSystem.SOLAR)
 
-        val deleteFailure = assertThrows(WidgetUpdateUnavailableException::class.java) {
-            runBlocking { container.dayMutationCoordinator.delete(id) }
-        }
-        assertTrue(deleteFailure.message.orEmpty().contains("小部件"))
-        assertNotNull(container.importantDays.get(id))
-        assertEquals(originalAlarmCount, alarms.scheduledAlarms.size)
+        container.dayMutationCoordinator.save(day(id = id, name = "新名称"))
+        assertEquals("新名称", container.importantDays.get(id)?.name)
+        assertTrue(alarms.scheduledAlarms.size <= originalAlarmCount)
 
-        val saveFailure = assertThrows(WidgetUpdateUnavailableException::class.java) {
-            runBlocking {
-                container.dayMutationCoordinator.save(day(id = id, name = "新名称"))
-            }
-        }
-        assertTrue(saveFailure.message.orEmpty().contains("小部件"))
-        assertEquals("原名称", container.importantDays.get(id)?.name)
-        assertEquals(originalAlarmCount, alarms.scheduledAlarms.size)
+        container.dayMutationCoordinator.delete(id)
+        assertNull(container.importantDays.get(id))
+        assertTrue(container.widgets.resolve(101) is com.nianri.app.data.WidgetResolution.MissingDay)
     }
 
     private fun viewModel(dayId: Long) = EditDayViewModel(
@@ -113,6 +103,15 @@ class AppContainerMutationIntegrationTest {
         clock = Clock.fixed(Instant.parse("2026-07-14T00:00:00Z"), ZoneOffset.UTC),
         permissionController = ReadyPermissionController,
     )
+
+    private fun waitForState(condition: () -> Boolean) {
+        repeat(300) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            if (condition()) return
+            Thread.sleep(10)
+        }
+        throw AssertionError("Timed out waiting for view-model state")
+    }
 
     private fun day(id: Long = 0, name: String) = ImportantDay(
         id = id,

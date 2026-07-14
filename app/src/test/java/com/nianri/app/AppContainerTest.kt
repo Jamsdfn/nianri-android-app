@@ -1,6 +1,8 @@
 package com.nianri.app
 
 import com.nianri.app.reminder.AndroidReminderScheduler
+import com.nianri.app.widget.AndroidWidgetInstanceUpdater
+import com.nianri.app.widget.ConfiguredWidgetUpdater
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,9 +21,10 @@ class AppContainerTest {
     }
 
     @Test
-    fun `container uses the temporary capability aware widget bridge`() {
+    fun `container binds the real per instance widget update chain`() {
         val container = AppContainer(RuntimeEnvironment.getApplication())
 
-        assertTrue(container.widgetUpdater is PreProviderWidgetUpdater)
+        assertTrue(container.widgetInstanceUpdater is AndroidWidgetInstanceUpdater)
+        assertTrue(container.widgetUpdater is ConfiguredWidgetUpdater)
     }
 }

@@ -18,6 +18,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".widget.WidgetConfigActivity"
+            android:exported="true" />
         <receiver
             android:name=".reminder.ReminderReceiver"
             android:exported="false" />
