@@ -1,13 +1,8 @@
 package com.nianri.app.ui
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -17,6 +12,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.nianri.app.AppContainer
 import com.nianri.app.data.UiPreferences
+import com.nianri.app.ui.detail.DetailScreen
+import com.nianri.app.ui.detail.DetailViewModel
+import com.nianri.app.ui.edit.EditDayScreen
+import com.nianri.app.ui.edit.EditDayViewModel
 import com.nianri.app.ui.home.HomeScreen
 import com.nianri.app.ui.home.HomeViewModel
 
@@ -53,21 +52,60 @@ fun NianriNavHost(
                     defaultValue = 0L
                 },
             ),
-        ) {
-            PlaceholderScreen("编辑重要日子")
+        ) { backStackEntry ->
+            val dayId = backStackEntry.arguments?.getLong("dayId") ?: 0L
+            val editViewModel: EditDayViewModel = viewModel(
+                factory = EditDayViewModel.Factory(dayId, container),
+            )
+            val state by editViewModel.uiState.collectAsStateWithLifecycle()
+            EditDayScreen(
+                state = state,
+                onBack = navController::popBackStack,
+                onNameChange = editViewModel::setName,
+                onBasisChange = editViewModel::setBasis,
+                onMonthChange = editViewModel::setMonth,
+                onDayChange = editViewModel::setDay,
+                onDisplayChange = editViewModel::setDisplay,
+                onToggleReminder = editViewModel::toggleReminder,
+                onPinnedChange = editViewModel::setPinned,
+                onSave = editViewModel::save,
+                onDelete = editViewModel::delete,
+                onSaved = { savedId ->
+                    if (dayId == 0L) {
+                        navController.navigate("detail/$savedId") {
+                            popUpTo("home")
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
+                },
+                onDeleted = {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                },
+            )
         }
         composable(
             route = "detail/{dayId}",
             arguments = listOf(navArgument("dayId") { type = NavType.LongType }),
-        ) {
-            PlaceholderScreen("重要日子详情")
+        ) { backStackEntry ->
+            val dayId = requireNotNull(backStackEntry.arguments?.getLong("dayId"))
+            val detailViewModel: DetailViewModel = viewModel(
+                factory = DetailViewModel.Factory(dayId, container),
+            )
+            val state by detailViewModel.uiState.collectAsStateWithLifecycle()
+            DetailScreen(
+                state = state,
+                onBack = navController::popBackStack,
+                onEdit = { id -> navController.navigate("edit?dayId=$id") },
+                onDelete = detailViewModel::delete,
+                onDeleted = {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                },
+            )
         }
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(title: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(title)
     }
 }

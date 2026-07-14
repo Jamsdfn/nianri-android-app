@@ -426,7 +426,7 @@ class HomeScreenTest {
     fun homeAddActionNavigatesToEdit() {
         ActivityScenario.launch(MainActivity::class.java).use {
             composeRule.onNodeWithTag("home-add").performClick()
-            composeRule.onNodeWithText("编辑重要日子").assertIsDisplayed()
+            composeRule.onNodeWithText("新建日子").assertIsDisplayed()
         }
     }
 
@@ -436,7 +436,7 @@ class HomeScreenTest {
             .putExtra("importantDayId", 88L)
 
         ActivityScenario.launch<MainActivity>(intent).use {
-            composeRule.onNodeWithText("重要日子详情").assertIsDisplayed()
+            composeRule.onNodeWithText("重要日子").assertIsDisplayed()
         }
     }
 
