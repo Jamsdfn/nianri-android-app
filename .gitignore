@@ -7,4 +7,4 @@ local.properties
 *.iml
 .DS_Store
 .superpowers/
-
+.worktrees/
