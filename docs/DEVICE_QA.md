@@ -82,6 +82,6 @@ Task 10 的 `EndToEndTest` 使用真实 Room repository、`DayMutationCoordinato
 - merged manifest 审计未发现 `android.permission.INTERNET` 或 `android.permission.USE_EXACT_ALARM`；应用自身仅声明通知、精确闹钟和开机恢复能力。
 - 交付 APK 是 debug APK，不是商店签名 release 包。
 - APK：`app/build/outputs/apk/debug/app-debug.apk`
-- Task 10 提交：`待提交后填写`
+- Task 10 已测试实现提交：`5a2e2c8`（后续仅追加本行证据引用）
 - 当前 debug APK SHA-256：`482209f003160a362b90b28a8ae42df3568dd20aac33167ee70c5094003b795f`
 - 最终 clean gate：`PENDING`。测试依赖/8sp 修复后的 `assembleDebug` 已通过；之后的 clean unit/lint/assemble 与设备复跑均被审批通道断线阻止，因此此处不虚报完成。
