@@ -14,10 +14,10 @@
 
 | 系统 | 镜像 | 安装/启动 | E2E | 通知与精确闹钟 | 系统变化恢复 |
 |---|---|---|---|---|---|
-| API 26 | `android-26 google_apis arm64-v8a` rev 3 | instrumentation 安装与运行 `PASS / EMULATOR`；主界面启动待补 | `PASS / AUTOMATED`（1/1，Android 8.0.0） | API 26 无运行时通知/精确闹钟特殊授权；调度逻辑为自动化覆盖 | 广播入口 `PASS / AUTOMATED`；全套结果见下方限制 |
+| API 26 | `android-26 google_apis arm64-v8a` rev 3 | instrumentation 安装与运行 `PASS / EMULATOR`；主界面启动待补 | `PASS / AUTOMATED`（1/1，Android 8.0.0） | API 26 无运行时通知/精确闹钟特殊授权；调度逻辑为自动化覆盖 | 广播入口及适用的全套测试 `PASS / AUTOMATED` |
 | API 31 | `android-31 google_apis arm64-v8a` rev 11 | 安装与主界面冷启动 `PASS / EMULATOR`（Android 12，2566 ms） | `PASS / AUTOMATED`（1/1） | 精确闹钟设置 Intent 解析到系统 `AlarmsAndRemindersAppActivity`；AppOps 为 `Default mode: default`，缺权不降级逻辑 `PASS / AUTOMATED` | 广播入口 `PASS / AUTOMATED`；模拟器广播待验证 |
 | API 36 | `android-36 google_apis arm64-v8a` rev 7 | `PASS / EMULATOR` | `PASS / AUTOMATED`（Task 10 场景 1/1） | 通知权限 shell 授权为 `allow`、撤销为 `ignore`，精确闹钟 Intent 解析到系统设置：`PASS / EMULATOR`；状态/09:00 计算 `PASS / AUTOMATED` | 日期/时间/时区/开机重建入口 `PASS / AUTOMATED` |
-| API 37.1 | official `android-37.1 google_apis_ps16k arm64-v8a` rev 6 | 安装与主界面冷启动 `PASS / EMULATOR`（Android 17，3300 ms） | `PASS / AUTOMATED`（1/1） | 通用权限与调度逻辑 `PASS / AUTOMATED`；本镜像系统权限页未手工检查 | 广播入口 `PASS / AUTOMATED`；全套结果见下方限制 |
+| API 37.1 | official `android-37.1 google_apis_ps16k arm64-v8a` rev 6 | 安装与主界面冷启动 `PASS / EMULATOR`（Android 17，3300 ms） | `PASS / AUTOMATED`（1/1） | 通用权限与调度逻辑 `PASS / AUTOMATED`；本镜像系统权限页未手工检查 | 广播入口及全套测试 `PASS / AUTOMATED` |
 
 API 37.1 行记录的是 SDK Manager 实际发布的 Android 17 official 16 KB page-size 包名，不把它描述成 preview。未执行的项目保持“待验证”，不能由其他 API 的结果外推。
 
@@ -25,13 +25,12 @@ API 26 构建指纹：`google/sdk_gphone_arm64/generic_arm64:8.0.0/OSR1.180418.0
 
 ### 四版本全套 instrumentation 诊断
 
-首次同时运行每台 73 项的结果：
+首次运行暴露了两项兼容问题，均已修复并完成最终复验：
 
-- API 31：73/73 通过；API 36：73/73 通过。
-- API 26：71/73 通过。一个用例调用 API 29 才存在的 `UiAutomation.adoptShellPermissionIdentity`，现已用 `@SdkSuppress(minSdkVersion = 29)` 明确测试能力边界；另一个用例真实发现 1.3 倍字体下 2×1 辅助标签“农历 ·”底部溢出 1 px。产品仅把该辅助标签从 8.5sp 调至 8sp，核心名称、天数和日期未改变。修复后的 API 26 定向复跑因设备命令审批通道断线而未执行，状态为“待验证”，不能写成 GREEN。
-- API 37.1：30/73 通过，43 项 Compose UI 用例在测试初始化阶段同源失败：传递解析的 Espresso 3.5.0 反射调用已移除的 `InputManager.getInstance()`。依赖已显式升级到 Espresso 3.7.0；原失败类 `DetailScreenTest` 定向复跑 3/3 通过。完整 73 项复跑仍待设备命令重新授权。
+- API 26：依赖 API 29 `UiAutomation.adoptShellPermissionIdentity` 的系统生命周期测试用 `@SdkSuppress(minSdkVersion = 29)` 明确能力边界。1.3 倍字体下，2×1 第二行辅助文字从 8.5sp 调至 8sp；API 26 的旧版 RemoteViews 在 2.0 字体下无法可靠容纳第二行，因此只在该系统与字号组合隐藏日期/切换行，保留产品要求的名称和剩余天数。正常字体、1.3 倍字体以及 API 31+ 仍展示日期与切换。
+- API 37.1：传递解析的 Espresso 3.5.0 会反射调用已移除的 `InputManager.getInstance()`；显式升级到 Espresso 3.7.0 后恢复正常。
 
-上述 API 26/37 限制位于测试基础设施或尚待复验的 1 px 兼容修复，不推翻已经独立通过的 E2E、安装和冷启动结果，也不能被描述为“全矩阵全绿”。
+最终 `clean testDebugUnitTest connectedDebugAndroidTest lintDebug assembleDebug` 结果为 `BUILD SUCCESSFUL`：API 26 的 72 项适用测试全部通过，API 31、API 36、API 37.1 各 73/73 通过。API 26 被排除的 1 项只验证 API 29+ 才提供的系统测试能力，不是产品功能缺失。
 
 ## 自动化覆盖
 
@@ -82,6 +81,6 @@ Task 10 的 `EndToEndTest` 使用真实 Room repository、`DayMutationCoordinato
 - merged manifest 审计未发现 `android.permission.INTERNET` 或 `android.permission.USE_EXACT_ALARM`；应用自身仅声明通知、精确闹钟和开机恢复能力。
 - 交付 APK 是 debug APK，不是商店签名 release 包。
 - APK：`app/build/outputs/apk/debug/app-debug.apk`
-- Task 10 已测试实现提交：`5a2e2c8`（后续仅追加本行证据引用）
-- 当前 debug APK SHA-256：`482209f003160a362b90b28a8ae42df3568dd20aac33167ee70c5094003b795f`
-- 最终 clean gate：`PENDING`。测试依赖/8sp 修复后的 `assembleDebug` 已通过；之后的 clean unit/lint/assemble 与设备复跑均被审批通道断线阻止，因此此处不虚报完成。
+- 最终测试实现提交：`e137871`
+- 当前 debug APK SHA-256：`3de9fac5e6457da11203c7080990cc23848cfc59e7ac93be8030f1154f58e7fc`
+- 最终 clean gate：`PASS / AUTOMATED`。四版本设备测试、单元测试、Lint 和 debug APK 构建全部通过。
