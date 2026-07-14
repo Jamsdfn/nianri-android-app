@@ -8,9 +8,9 @@ import com.nianri.app.CurrentSystemZoneClock
 import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.model.CalendarSystem
-import com.nianri.app.domain.model.DateAdjustment
 import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
+import com.nianri.app.domain.model.adjustmentCopy
 import com.nianri.app.domain.model.Occurrence
 import java.time.Clock
 import java.time.LocalDate
@@ -125,11 +125,6 @@ class DetailViewModel(
     }
 }
 
-internal fun adjustmentCopy(adjustment: DateAdjustment?): String? = when (adjustment) {
-    DateAdjustment.NON_LEAP_YEAR -> "今年不是闰年，本次提前 1 天至 2 月 28 日"
-    DateAdjustment.SHORT_LUNAR_MONTH -> "本月只有二十九天，本次提前 1 天至廿九"
-    null -> null
-}
 
 internal fun reminderSummary(reminders: Set<Int>): String = if (reminders.isEmpty()) {
     "未开启提醒"

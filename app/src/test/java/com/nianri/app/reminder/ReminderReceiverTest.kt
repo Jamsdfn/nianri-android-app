@@ -79,8 +79,21 @@ class ReminderReceiverTest {
 
         assertTrue(service(LocalDate.of(2027, 2, 14)).deliver(42, 14))
         assertEquals(
-            "妈妈生日还有 14 天 · 2月28日 · 本次提前 1 天：当前不是闰年",
+            "妈妈生日还有 14 天 · 2月28日 · 今年不是闰年，本次提前 1 天",
             shadowOf(shadowOf(notifications).allNotifications.single()).contentText,
+        )
+    }
+
+    @Test
+    fun `short lunar month uses the shared approved adjustment copy`() {
+        assertEquals(
+            "纪念日还有 3 天 · 8月3日 · 本月只有二十九天，本次提前 1 天",
+            reminderCopy(
+                name = "纪念日",
+                daysRemaining = 3,
+                date = LocalDate.of(2026, 8, 3),
+                adjustment = com.nianri.app.domain.model.DateAdjustment.SHORT_LUNAR_MONTH,
+            ),
         )
     }
 

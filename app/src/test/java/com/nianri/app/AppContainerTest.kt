@@ -1,8 +1,6 @@
 package com.nianri.app
 
 import com.nianri.app.reminder.AndroidReminderScheduler
-import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,11 +19,9 @@ class AppContainerTest {
     }
 
     @Test
-    fun `deferred widget binding fails fast with its adapter name`() {
-        val failure = assertThrows(IllegalStateException::class.java) {
-            runBlocking { DeferredWidgetUpdater.updateAll() }
-        }
+    fun `container uses the temporary capability aware widget bridge`() {
+        val container = AppContainer(RuntimeEnvironment.getApplication())
 
-        assertTrue(failure.message.orEmpty().contains("WidgetUpdater"))
+        assertTrue(container.widgetUpdater is PreProviderWidgetUpdater)
     }
 }

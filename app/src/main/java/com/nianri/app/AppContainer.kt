@@ -8,6 +8,7 @@ import com.nianri.app.data.local.NianriDatabase
 import com.nianri.app.domain.DayListProjector
 import com.nianri.app.domain.DayMutationCoordinator
 import com.nianri.app.domain.WidgetUpdater
+import com.nianri.app.domain.WidgetUpdateUnavailableException
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.calendar.IcuCalendarConverter
 import com.nianri.app.reminder.AndroidReminderScheduler
@@ -40,7 +41,9 @@ class AppContainer(context: Context) {
             clock = CurrentSystemZoneClock(),
         )
     }
-    val widgetUpdater: WidgetUpdater by lazy { DeferredWidgetUpdater }
+    val widgetUpdater: WidgetUpdater by lazy {
+        PreProviderWidgetUpdater(widgets::hasConfiguredWidgets)
+    }
     val dayListProjector by lazy {
         DayListProjector(
             days = importantDays,
@@ -69,8 +72,16 @@ class CurrentSystemZoneClock(
     override fun instant(): Instant = instantSource.instant()
 }
 
-internal data object DeferredWidgetUpdater : WidgetUpdater {
-    override suspend fun updateAll(): Nothing = throw IllegalStateException(
-        "WidgetUpdater adapter is not wired; Task 8 or 9 must provide the Android binding",
-    )
+internal class PreProviderWidgetUpdater(
+    private val hasConfiguredWidgets: suspend () -> Boolean,
+) : WidgetUpdater {
+    override suspend fun prepareMutation() {
+        if (hasConfiguredWidgets()) {
+            throw WidgetUpdateUnavailableException(
+                "已有小部件配置，完成小部件更新能力前不能修改日子",
+            )
+        }
+    }
+
+    override suspend fun updateAll() = Unit
 }

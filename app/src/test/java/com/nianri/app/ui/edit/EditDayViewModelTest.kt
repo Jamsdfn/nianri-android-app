@@ -2,6 +2,7 @@ package com.nianri.app.ui.edit
 
 import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
+import com.nianri.app.domain.WidgetUpdateUnavailableException
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
@@ -114,6 +115,26 @@ class EditDayViewModelTest {
 
         assertEquals(1, permissions.notificationStarts)
         assertEquals(ReminderPermissionState.Denied, viewModel.uiState.value.permissionStatus)
+    }
+
+    @Test
+    fun `pre widget capability block is explained instead of reported as a generic save failure`() {
+        val viewModel = EditDayViewModel(
+            dayId = 0,
+            loadDay = { null },
+            saveDay = { throw WidgetUpdateUnavailableException("已有小部件配置，暂时无法修改") },
+            deleteDay = {},
+            calculator = DateOccurrenceCalculator(converter),
+            converter = converter,
+            clock = clock,
+            permissionController = FakePermissionController(ReminderPermissionState.Ready),
+        )
+        viewModel.setName("生日")
+
+        viewModel.save()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("已有小部件配置，暂时无法修改", viewModel.uiState.value.operationError)
     }
 
     @Test

@@ -14,4 +14,7 @@ interface WidgetPreferenceDao {
 
     @Query("SELECT COUNT(*) FROM widget_preferences WHERE importantDayId = :dayId")
     suspend fun countForDay(dayId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM widget_preferences")
+    suspend fun countAll(): Int
 }

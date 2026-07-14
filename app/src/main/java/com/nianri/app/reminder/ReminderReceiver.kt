@@ -15,6 +15,7 @@ import com.nianri.app.NianriApplication
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.model.DateAdjustment
 import com.nianri.app.domain.model.ImportantDay
+import com.nianri.app.domain.model.adjustmentCopy
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
@@ -97,10 +98,6 @@ class ReminderNotificationService(
 
 fun reminderCopy(name: String, daysRemaining: Long, date: LocalDate, adjustment: DateAdjustment?): String {
     val countdown = if (daysRemaining == 0L) "${name}就是今天" else "${name}还有 $daysRemaining 天"
-    val adjustmentCopy = when (adjustment) {
-        DateAdjustment.NON_LEAP_YEAR -> " · 本次提前 1 天：当前不是闰年"
-        DateAdjustment.SHORT_LUNAR_MONTH -> " · 本次提前 1 天：当前农历月仅有二十九天"
-        null -> ""
-    }
-    return "$countdown · ${date.monthValue}月${date.dayOfMonth}日$adjustmentCopy"
+    val adjustmentSuffix = adjustmentCopy(adjustment)?.let { " · $it" }.orEmpty()
+    return "$countdown · ${date.monthValue}月${date.dayOfMonth}日$adjustmentSuffix"
 }

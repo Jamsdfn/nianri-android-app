@@ -7,6 +7,7 @@ import com.nianri.app.domain.model.DateAdjustment
 import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.domain.model.LunarDate
+import com.nianri.app.domain.model.adjustmentCopy
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -43,7 +44,7 @@ class DetailViewModelTest {
         val state = viewModel.uiState.value
         assertEquals("2027年2月28日", state.solarDate?.text)
         assertEquals("农历正月廿三", state.lunarDate?.text)
-        assertEquals("今年不是闰年，本次提前 1 天至 2 月 28 日", state.adjustmentCopy)
+        assertEquals("今年不是闰年，本次提前 1 天", state.adjustmentCopy)
         assertEquals(2, state.widgetReferences)
         assertEquals("提前 14、3 天", state.reminderSummary)
     }
@@ -95,7 +96,7 @@ class DetailViewModelTest {
     @Test
     fun `short lunar month adjustment says occurrence moved one day earlier`() {
         assertEquals(
-            "本月只有二十九天，本次提前 1 天至廿九",
+            "本月只有二十九天，本次提前 1 天",
             adjustmentCopy(DateAdjustment.SHORT_LUNAR_MONTH),
         )
     }

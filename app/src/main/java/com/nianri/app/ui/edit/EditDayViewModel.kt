@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.nianri.app.AppContainer
 import com.nianri.app.CurrentSystemZoneClock
 import com.nianri.app.domain.DayCardModel
+import com.nianri.app.domain.WidgetUpdateUnavailableException
 import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.CalendarOperationException
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
@@ -135,6 +136,10 @@ class EditDayViewModel(
             try {
                 val id = saveDay(current.toImportantDay())
                 mutableState.update { it.copy(isSaving = false, savedId = id) }
+            } catch (error: WidgetUpdateUnavailableException) {
+                mutableState.update {
+                    it.copy(isSaving = false, operationError = error.message ?: "已有小部件配置，暂时无法修改")
+                }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 mutableState.update { it.copy(isSaving = false, operationError = "保存失败，请重试") }
@@ -149,6 +154,10 @@ class EditDayViewModel(
             try {
                 deleteDay(id)
                 mutableState.update { it.copy(deleted = true) }
+            } catch (error: WidgetUpdateUnavailableException) {
+                mutableState.update {
+                    it.copy(operationError = error.message ?: "已有小部件配置，暂时无法修改")
+                }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 mutableState.update { it.copy(operationError = "删除失败，请重试") }
