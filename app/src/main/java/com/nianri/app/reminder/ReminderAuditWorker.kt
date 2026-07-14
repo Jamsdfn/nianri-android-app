@@ -14,9 +14,20 @@ class ReminderAuditWorker(
     applicationContext: Context,
     workerParameters: WorkerParameters,
 ) : CoroutineWorker(applicationContext, workerParameters) {
-    override suspend fun doWork(): Result = runReminderAudit {
-        (applicationContext as NianriApplication).container.reminderScheduler.rebuildAll()
+    override suspend fun doWork(): Result {
+        val container = (applicationContext as NianriApplication).container
+        return runDailyAudit(
+            rebuildReminders = container.reminderScheduler::rebuildAll,
+            updateWidgets = container.widgetUpdater::updateAll,
+        )
     }
+}
+
+suspend fun runDailyAudit(
+    rebuildReminders: suspend () -> Unit,
+    updateWidgets: suspend () -> Unit,
+): ListenableWorker.Result = runReminderAudit {
+    runSystemChangeRefresh(rebuildReminders, updateWidgets)
 }
 
 suspend fun runReminderAudit(rebuild: suspend () -> Unit): ListenableWorker.Result = try {

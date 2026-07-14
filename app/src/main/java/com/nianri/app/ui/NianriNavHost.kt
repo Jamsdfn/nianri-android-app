@@ -32,11 +32,13 @@ fun NianriNavHost(
     container: AppContainer,
     uiPreferences: UiPreferences,
     importantDayId: Long? = null,
+    editImportantDayId: Long? = null,
     openNewDay: Boolean = false,
 ) {
     val navController = rememberNavController()
-    val startDestination = remember(importantDayId, openNewDay) {
+    val startDestination = remember(importantDayId, editImportantDayId, openNewDay) {
         when {
+            editImportantDayId != null -> "edit?dayId=$editImportantDayId"
             importantDayId != null -> "detail/$importantDayId"
             openNewDay -> "edit?dayId=0"
             else -> "home"

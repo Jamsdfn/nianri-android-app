@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import com.nianri.app.NianriApplication
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -16,12 +17,39 @@ class SystemChangeReceiver : BroadcastReceiver() {
         val application = context.applicationContext as NianriApplication
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                application.container.reminderScheduler.rebuildAll()
+                runSystemChangeRefresh(
+                    rebuildReminders = application.container.reminderScheduler::rebuildAll,
+                    updateWidgets = application.container.widgetUpdater::updateAll,
+                )
             } finally {
                 pendingResult.finish()
             }
         }
     }
+}
+
+suspend fun runSystemChangeRefresh(
+    rebuildReminders: suspend () -> Unit,
+    updateWidgets: suspend () -> Unit,
+) {
+    var failure: Exception? = null
+    try {
+        rebuildReminders()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        failure = error
+    }
+
+    try {
+        updateWidgets()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        if (failure == null) failure = error else failure.addSuppressed(error)
+    }
+
+    failure?.let { throw it }
 }
 
 fun isSystemRebuildAction(action: String?): Boolean = action in SYSTEM_REBUILD_ACTIONS

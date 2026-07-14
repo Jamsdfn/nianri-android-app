@@ -2,6 +2,7 @@ package com.nianri.app.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -60,10 +61,18 @@ class WidgetConfigActivity : ComponentActivity() {
             finish()
             return
         }
+        if (!ownsWidget(appWidgetId)) {
+            finish()
+            return
+        }
 
         val container = (application as NianriApplication).container
         lifecycleScope.launch {
             val resolution = container.widgets.resolve(appWidgetId)
+            if (!ownsWidget(appWidgetId)) {
+                finish()
+                return@launch
+            }
             val configured = resolution as? WidgetResolution.Configured
             setContent {
                 val days by container.importantDays.observeAll()
@@ -89,6 +98,10 @@ class WidgetConfigActivity : ComponentActivity() {
                             )
                         },
                         onSave = save@{
+                            if (!ownsWidget(appWidgetId)) {
+                                finish()
+                                return@save
+                            }
                             val selected = days.firstOrNull { it.id == selectedId }
                                 ?: return@save
                             lifecycleScope.launch {
@@ -118,6 +131,15 @@ class WidgetConfigActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun ownsWidget(appWidgetId: Int): Boolean =
+        ownershipCheckOverride?.invoke(this, appWidgetId)
+            ?: WidgetProviderOwnership(this).owns(appWidgetId)
+
+    companion object {
+        /** Instrumentation-only seam; production always resolves ownership through AppWidgetManager. */
+        internal var ownershipCheckOverride: ((Context, Int) -> Boolean)? = null
     }
 }
 

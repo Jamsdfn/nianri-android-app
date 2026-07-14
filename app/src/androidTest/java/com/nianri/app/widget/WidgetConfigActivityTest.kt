@@ -43,12 +43,57 @@ class WidgetConfigActivityTest {
 
     @Before
     fun clearData() = runBlocking {
+        WidgetConfigActivity.ownershipCheckOverride = { _, id -> id != AppWidgetManager.INVALID_APPWIDGET_ID }
         withContext(Dispatchers.IO) { container.database.clearAllTables() }
     }
 
     @After
     fun clearAfter() = runBlocking {
+        WidgetConfigActivity.ownershipCheckOverride = null
         withContext(Dispatchers.IO) { container.database.clearAllTables() }
+    }
+
+    @Test
+    fun nonOwnedWidgetIdFinishesCanceledWithoutDisplayingOrSaving() {
+        WidgetConfigActivity.ownershipCheckOverride = { _, _ -> false }
+
+        val scenario = ActivityScenario.launchActivityForResult<WidgetConfigActivity>(intent(400))
+
+        assertEquals(Activity.RESULT_CANCELED, scenario.result.resultCode)
+        assertTrue(runBlocking { container.widgets.configuredWidgetIds().isEmpty() })
+    }
+
+    @Test
+    fun ownershipIsRevalidatedBeforeDisplayAndSave() = runBlocking {
+        val dayId = container.importantDays.save(day("安全日子", CalendarSystem.SOLAR, CalendarSystem.SOLAR))
+        var checks = 0
+        WidgetConfigActivity.ownershipCheckOverride = { _, _ ->
+            checks += 1
+            true
+        }
+        val scenario = ActivityScenario.launchActivityForResult<WidgetConfigActivity>(intent(409))
+
+        waitForText("安全日子")
+        compose.onNodeWithTag("widget-day-$dayId").performClick()
+        compose.onNodeWithTag("widget-config-save").performClick()
+
+        assertEquals(Activity.RESULT_OK, scenario.result.resultCode)
+        assertTrue("entry, display, and save ownership checks", checks >= 3)
+    }
+
+    @Test
+    fun ownershipRevokedBeforeSaveCancelsWithoutWritingPreference() = runBlocking {
+        val dayId = container.importantDays.save(day("不应泄露", CalendarSystem.SOLAR, CalendarSystem.SOLAR))
+        var checks = 0
+        WidgetConfigActivity.ownershipCheckOverride = { _, _ -> ++checks < 3 }
+        val scenario = ActivityScenario.launchActivityForResult<WidgetConfigActivity>(intent(410))
+
+        waitForText("不应泄露")
+        compose.onNodeWithTag("widget-day-$dayId").performClick()
+        compose.onNodeWithTag("widget-config-save").performClick()
+
+        assertEquals(Activity.RESULT_CANCELED, scenario.result.resultCode)
+        assertTrue(container.widgets.resolve(410) is WidgetResolution.Unconfigured)
     }
 
     @Test

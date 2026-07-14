@@ -33,12 +33,56 @@ class ReminderRecoveryTest {
     }
 
     @Test
+    fun `system date changes refresh reminders and widget countdowns`() = runBlocking {
+        val calls = mutableListOf<String>()
+
+        runSystemChangeRefresh(
+            rebuildReminders = { calls += "reminders" },
+            updateWidgets = { calls += "widgets" },
+        )
+
+        assertEquals(listOf("reminders", "widgets"), calls)
+    }
+
+    @Test
+    fun `widget countdown refresh still runs when reminder rebuild fails`() {
+        val calls = mutableListOf<String>()
+
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking {
+                runSystemChangeRefresh(
+                    rebuildReminders = {
+                        calls += "reminders"
+                        error("alarm unavailable")
+                    },
+                    updateWidgets = { calls += "widgets" },
+                )
+            }
+        }
+
+        assertEquals(listOf("reminders", "widgets"), calls)
+    }
+
+    @Test
     fun `audit request runs every 24 hours with 2 hour flex`() {
         val request = reminderAuditRequest()
 
         assertEquals(Duration.ofHours(24).toMillis(), request.workSpec.intervalDuration)
         assertEquals(Duration.ofHours(2).toMillis(), request.workSpec.flexDuration)
         assertEquals(ReminderAuditWorker::class.java.name, request.workSpec.workerClassName)
+    }
+
+    @Test
+    fun `daily audit redundantly refreshes reminder and widget state`() = runBlocking {
+        val calls = mutableListOf<String>()
+
+        val result = runDailyAudit(
+            rebuildReminders = { calls += "reminders" },
+            updateWidgets = { calls += "widgets" },
+        )
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        assertEquals(listOf("reminders", "widgets"), calls)
     }
 
     @Test
