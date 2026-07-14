@@ -31,7 +31,7 @@ import org.junit.Test
 
 class EndToEndTest {
     @Test
-    fun annualDaysKeepTheirBasisWhileAppAndWidgetsSwitchDisplaysIndependently() = runBlocking {
+    fun annualDaysKeepTheirBasisWhileAppAndWidgetsShareDisplayState() = runBlocking {
         EndToEndHarness().use { scenario ->
             val lunarId = scenario.createLunarDay(
                 name = "妈妈生日",
@@ -80,9 +80,9 @@ class EndToEndTest {
             val firstWidget = scenario.widget(1001)
             val secondWidget = scenario.widget(1002)
             assertEquals(lunarId, firstWidget.id)
-            assertEquals(CalendarSystem.SOLAR, firstWidget.display)
+            assertEquals(CalendarSystem.LUNAR, firstWidget.display)
             assertEquals(solarId, secondWidget.id)
-            assertEquals(CalendarSystem.LUNAR, secondWidget.display)
+            assertEquals(CalendarSystem.SOLAR, secondWidget.display)
 
             scenario.delete(lunarId)
             assertTrue(scenario.widgetResolution(1001) is WidgetResolution.MissingDay)
@@ -98,7 +98,7 @@ class EndToEndTest {
             assertEquals(solarId, scenario.widget(1001).id)
             assertEquals(CalendarSystem.SOLAR, scenario.widget(1001).display)
             assertEquals(solarId, scenario.widget(1002).id)
-            assertEquals(CalendarSystem.LUNAR, scenario.widget(1002).display)
+            assertEquals(CalendarSystem.SOLAR, scenario.widget(1002).display)
         }
     }
 }

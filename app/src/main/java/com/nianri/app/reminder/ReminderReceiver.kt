@@ -36,6 +36,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     loadDay = application.container.importantDays::get,
                     calculator = application.container.occurrenceCalculator,
                     clock = Clock.systemDefaultZone(),
+                    dayOfLedger = application.container.dayOfReminderLedger,
                 ).deliver(dayId, offset)
             } finally {
                 pendingResult.finish()
@@ -46,7 +47,7 @@ class ReminderReceiver : BroadcastReceiver() {
     companion object {
         const val EXTRA_DAY_ID = "dayId"
         const val EXTRA_OFFSET = "offset"
-        val ALLOWED_OFFSETS = setOf(14, 7, 3)
+        val ALLOWED_OFFSETS = setOf(14, 7, 3, 0)
     }
 }
 
@@ -55,13 +56,14 @@ class ReminderNotificationService(
     private val loadDay: suspend (Long) -> ImportantDay?,
     private val calculator: DateOccurrenceCalculator,
     private val clock: Clock,
+    private val dayOfLedger: DayOfReminderLedger = DayOfReminderLedger(context),
 ) {
     private val applicationContext = context.applicationContext
     private val notificationManager = applicationContext.getSystemService(NotificationManager::class.java)
 
     suspend fun deliver(dayId: Long, offset: Int): Boolean {
         val day = loadDay(dayId) ?: return false
-        if (offset !in day.reminders) return false
+        if (offset != 0 && offset !in day.reminders) return false
         val today = LocalDate.now(clock)
         val occurrence = calculator.next(day, today)
         if (occurrence.solarDate.minusDays(offset.toLong()) != today) return false
@@ -69,26 +71,34 @@ class ReminderNotificationService(
             applicationContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return false
 
-        notificationManager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "重要日子提醒", NotificationManager.IMPORTANCE_DEFAULT),
-        )
-        val contentIntent = PendingIntent.getActivity(
-            applicationContext,
-            dayId.hashCode(),
-            Intent(applicationContext, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_IMPORTANT_DAY_ID, dayId)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = Notification.Builder(applicationContext, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(day.name)
-            .setContentText(reminderCopy(day.name, occurrence.daysRemaining, occurrence.solarDate, occurrence.adjustment))
-            .setContentIntent(contentIntent)
-            .setAutoCancel(true)
-            .build()
-        notificationManager.notify(dayId.hashCode() * 31 + offset, notification)
-        return true
+        val postNotification = {
+            notificationManager.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "重要日子提醒", NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            val contentIntent = PendingIntent.getActivity(
+                applicationContext,
+                dayId.hashCode(),
+                Intent(applicationContext, MainActivity::class.java)
+                    .putExtra(MainActivity.EXTRA_IMPORTANT_DAY_ID, dayId)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val notification = Notification.Builder(applicationContext, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle(day.name)
+                .setContentText(reminderCopy(day.name, occurrence.daysRemaining, occurrence.solarDate, occurrence.adjustment))
+                .setContentIntent(contentIntent)
+                .setOnlyAlertOnce(true)
+                .setAutoCancel(true)
+                .build()
+            notificationManager.notify(dayId.hashCode() * 31 + offset, notification)
+        }
+        return if (offset == 0) {
+            dayOfLedger.deliverOnce(dayId, occurrence.solarDate, postNotification)
+        } else {
+            postNotification()
+            true
+        }
     }
 
     companion object {

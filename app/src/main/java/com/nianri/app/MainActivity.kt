@@ -3,11 +3,23 @@ package com.nianri.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkManager
 import com.nianri.app.data.UiPreferences
+import com.nianri.app.reminder.reminderImmediateAuditRequest
 import com.nianri.app.ui.NianriNavHost
 import com.nianri.app.ui.theme.NianriTheme
 
 class MainActivity : ComponentActivity() {
+    override fun onResume() {
+        super.onResume()
+        WorkManager.getInstance(this).enqueueUniqueWork(
+            NianriApplication.REMINDER_FOREGROUND_AUDIT_WORK,
+            ExistingWorkPolicy.REPLACE,
+            reminderImmediateAuditRequest(),
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val application = application as NianriApplication

@@ -16,6 +16,7 @@ class AndroidReminderScheduler(
     private val loadAllDays: suspend () -> List<ImportantDay>,
     private val calculator: DateOccurrenceCalculator,
     private val clock: Clock,
+    private val immediateDispatcher: (Intent) -> Unit = context.applicationContext::sendBroadcast,
 ) : ReminderScheduler {
     private val applicationContext = context.applicationContext
     private val alarmManager = applicationContext.getSystemService(AlarmManager::class.java)
@@ -23,32 +24,37 @@ class AndroidReminderScheduler(
     override suspend fun replace(dayId: Long): ReminderScheduleResult {
         cancel(dayId)
         val day = loadDay(dayId) ?: return ReminderScheduleResult.Scheduled(0)
-        if (day.reminders.isEmpty()) return ReminderScheduleResult.Scheduled(0)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-            return ReminderScheduleResult.NeedsExactAlarmPermission
-        }
         val today = LocalDate.now(clock)
         val occurrence = calculator.next(day, today)
-        var count = 0
-        day.reminders.sortedDescending().forEach { offset ->
+        val future = (day.reminders + DAY_OF_OFFSET).sortedDescending().mapNotNull { offset ->
             val trigger = occurrence.solarDate.minusDays(offset.toLong())
                 .atTime(9, 0)
                 .atZone(clock.zone)
                 .toInstant()
-            if (trigger > clock.instant()) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    trigger.toEpochMilli(),
-                    requireNotNull(pendingIntent(dayId, offset, PendingIntent.FLAG_UPDATE_CURRENT)),
-                )
-                count += 1
+            when {
+                trigger > clock.instant() -> Triple(offset, trigger, pendingIntent(dayId, offset, PendingIntent.FLAG_UPDATE_CURRENT))
+                offset == DAY_OF_OFFSET && occurrence.solarDate == today -> {
+                    immediateDispatcher(reminderIntent(dayId, offset))
+                    null
+                }
+                else -> null
             }
         }
-        return ReminderScheduleResult.Scheduled(count)
+        if (future.isNotEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            return ReminderScheduleResult.NeedsExactAlarmPermission
+        }
+        future.forEach { (_, trigger, operation) ->
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                trigger.toEpochMilli(),
+                requireNotNull(operation),
+            )
+        }
+        return ReminderScheduleResult.Scheduled(future.size)
     }
 
     override suspend fun cancel(dayId: Long) {
-        REMINDER_OFFSETS.forEach { offset ->
+        (REMINDER_OFFSETS + DAY_OF_OFFSET).forEach { offset ->
             pendingIntent(dayId, offset, PendingIntent.FLAG_NO_CREATE)?.let(alarmManager::cancel)
         }
     }
@@ -61,15 +67,19 @@ class AndroidReminderScheduler(
         PendingIntent.getBroadcast(
             applicationContext,
             requestCode(dayId, offset),
-            Intent(applicationContext, ReminderReceiver::class.java)
-                .putExtra(ReminderReceiver.EXTRA_DAY_ID, dayId)
-                .putExtra(ReminderReceiver.EXTRA_OFFSET, offset),
+            reminderIntent(dayId, offset),
             lookupFlag or PendingIntent.FLAG_IMMUTABLE,
         )
+
+    private fun reminderIntent(dayId: Long, offset: Int) =
+        Intent(applicationContext, ReminderReceiver::class.java)
+            .putExtra(ReminderReceiver.EXTRA_DAY_ID, dayId)
+            .putExtra(ReminderReceiver.EXTRA_OFFSET, offset)
 
     private fun requestCode(dayId: Long, offset: Int): Int = 31 * dayId.hashCode() + offset
 
     private companion object {
         val REMINDER_OFFSETS = setOf(14, 7, 3)
+        const val DAY_OF_OFFSET = 0
     }
 }

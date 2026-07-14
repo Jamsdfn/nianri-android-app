@@ -170,7 +170,7 @@ class EditDayViewModel(
     }
 
     private fun EditDayUiState.withPermissionState() = copy(
-        permissionStatus = permissionController.state(reminders.isNotEmpty()),
+        permissionStatus = permissionController.state(hasReminders = true),
     )
 
     private fun EditDayUiState.withPreview(): EditDayUiState {

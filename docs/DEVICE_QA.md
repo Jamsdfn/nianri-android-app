@@ -30,7 +30,7 @@ API 26 构建指纹：`google/sdk_gphone_arm64/generic_arm64:8.0.0/OSR1.180418.0
 - API 26：依赖 API 29 `UiAutomation.adoptShellPermissionIdentity` 的系统生命周期测试用 `@SdkSuppress(minSdkVersion = 29)` 明确能力边界。1.3 倍字体下，2×1 第二行辅助文字从 8.5sp 调至 8sp；API 26 的旧版 RemoteViews 在 2.0 字体下无法可靠容纳第二行，因此只在该系统与字号组合隐藏日期/切换行，保留产品要求的名称和剩余天数。正常字体、1.3 倍字体以及 API 31+ 仍展示日期与切换。
 - API 37.1：传递解析的 Espresso 3.5.0 会反射调用已移除的 `InputManager.getInstance()`；显式升级到 Espresso 3.7.0 后恢复正常。
 
-最终 `clean testDebugUnitTest connectedDebugAndroidTest lintDebug assembleDebug` 结果为 `BUILD SUCCESSFUL`：API 26 的 72 项适用测试全部通过，API 31、API 36、API 37.1 各 73/73 通过。API 26 被排除的 1 项只验证 API 29+ 才提供的系统测试能力，不是产品功能缺失。
+2026-07-14 最新复验结果：`testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest` 为 `BUILD SUCCESSFUL`；完整 instrumentation 在 API 26 为 73/73，在 API 31、API 36、API 37.1 各为 74/74。API 26 被排除的 1 项只验证 API 29+ 才提供的系统测试能力，不是产品功能缺失。
 
 ## 自动化覆盖
 
@@ -39,11 +39,11 @@ Task 10 的 `EndToEndTest` 使用真实 Room repository、`DayMutationCoordinato
 1. 创建以农历为倒计时基准、默认显示新历的日子；
 2. 切换 App 日期显示后，本次实际新历日期和剩余天数均不变；
 3. 置顶该日子并创建另一条新历日子；
-4. 两个 widget ID 分别选择不同记录和不同显示历法；
+4. 两个 widget ID 分别选择不同记录，并继承各记录在 App 内的展示历法；
 5. 删除第一个小部件引用的记录后得到 `MissingDay`；
-6. 原 widget ID 能改选剩余记录，另一个小部件选择不受影响。
+6. 原 widget ID 能改选剩余记录；同一日子的 App 与全部小部件共享展示历法。
 
-现有自动化还覆盖本地 09:00 计算、14/7/3 独立请求码、过去时间跳过、通知/精确闹钟权限状态、重启/日期/时间/时区广播、每日审计，以及默认/1.15/1.3/2.0 字体下的 RemoteViews 边界。
+现有自动化还覆盖当天 09:00 固定提醒、同一日期只投递一次、错过 09:00 后即时补发、14/7/3 独立请求码、通知/精确闹钟权限状态、重启/日期/时间/时区广播、每日与前台恢复审计，以及默认/1.15/1.3/2.0 字体下的 RemoteViews 边界。
 
 真实“上午 9:00 到点收到通知”、整机重启后的 OEM 投递和 HyperOS 省电策略需要真实时间与真机观察，目前是 `PENDING / MANUAL TIME`，不能用计算测试代替。
 

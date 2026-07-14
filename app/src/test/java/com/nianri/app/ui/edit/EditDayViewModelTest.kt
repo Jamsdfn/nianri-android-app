@@ -95,13 +95,13 @@ class EditDayViewModelTest {
     }
 
     @Test
-    fun `permission state follows whether any reminder is selected`() {
+    fun `mandatory day-of reminder keeps permission required when optional reminders are off`() {
         val permissions = FakePermissionController(ReminderPermissionState.WaitingForNotificationPermission)
         val viewModel = viewModel(permissions = permissions)
 
         assertEquals(ReminderPermissionState.WaitingForNotificationPermission, viewModel.uiState.value.permissionStatus)
         listOf(14, 7, 3).forEach(viewModel::toggleReminder)
-        assertEquals(ReminderPermissionState.NotNeeded, viewModel.uiState.value.permissionStatus)
+        assertEquals(ReminderPermissionState.WaitingForNotificationPermission, viewModel.uiState.value.permissionStatus)
     }
 
     @Test

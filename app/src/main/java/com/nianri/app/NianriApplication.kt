@@ -26,5 +26,6 @@ class NianriApplication : Application() {
 
     companion object {
         const val REMINDER_AUDIT_WORK = "reminder_daily_audit"
+        const val REMINDER_FOREGROUND_AUDIT_WORK = "reminder_foreground_audit"
     }
 }

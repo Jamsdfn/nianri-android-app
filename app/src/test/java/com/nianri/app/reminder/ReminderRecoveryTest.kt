@@ -73,6 +73,14 @@ class ReminderRecoveryTest {
     }
 
     @Test
+    fun `foreground audit request is immediate one time work`() {
+        val request = reminderImmediateAuditRequest()
+
+        assertEquals(0L, request.workSpec.intervalDuration)
+        assertEquals(ReminderAuditWorker::class.java.name, request.workSpec.workerClassName)
+    }
+
+    @Test
     fun `daily audit redundantly refreshes reminder and widget state`() = runBlocking {
         val calls = mutableListOf<String>()
 

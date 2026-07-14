@@ -185,12 +185,12 @@ class EditDayScreenTest {
     }
 
     @Test
-    fun allRemindersOffShowsHonestStatus() {
+    fun optionalRemindersOffStillShowsMandatoryDayOfReminder() {
         compose.setContent {
             EditDayScreen(
                 state = state().copy(
                     reminders = emptySet(),
-                    permissionStatus = ReminderPermissionState.NotNeeded,
+                    permissionStatus = ReminderPermissionState.Ready,
                 ),
                 widgetReferences = 0,
                 onBack = {}, onNameChange = {}, onBasisChange = {},
@@ -199,7 +199,8 @@ class EditDayScreenTest {
             )
         }
 
-        compose.onNodeWithText("未开启提醒").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("当天 09:00 · 固定开启").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("通知与闹钟权限已就绪").performScrollTo().assertIsDisplayed()
     }
 
     @Test

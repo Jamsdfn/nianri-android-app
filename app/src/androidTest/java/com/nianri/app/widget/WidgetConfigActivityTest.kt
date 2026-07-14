@@ -149,7 +149,7 @@ class WidgetConfigActivityTest {
     }
 
     @Test
-    fun reconfiguringTheSameDayKeepsItsIndependentDisplay() = runBlocking {
+    fun reconfiguringTheSameDayUsesItsLinkedAppDisplay() = runBlocking {
         val dayId = container.importantDays.save(day("同一个日子", CalendarSystem.SOLAR, CalendarSystem.SOLAR))
         container.widgets.select(408, dayId, CalendarSystem.LUNAR)
         val scenario = ActivityScenario.launchActivityForResult<WidgetConfigActivity>(intent(408))
@@ -160,7 +160,7 @@ class WidgetConfigActivityTest {
 
         assertEquals(Activity.RESULT_OK, scenario.result.resultCode)
         assertEquals(
-            WidgetResolution.Configured(container.importantDays.get(dayId)!!, CalendarSystem.LUNAR),
+            WidgetResolution.Configured(container.importantDays.get(dayId)!!, CalendarSystem.SOLAR),
             container.widgets.resolve(408),
         )
     }

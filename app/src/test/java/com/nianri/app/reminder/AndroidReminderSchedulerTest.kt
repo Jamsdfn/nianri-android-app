@@ -2,6 +2,7 @@ package com.nianri.app.reminder
 
 import android.app.AlarmManager
 import android.content.Context
+import android.content.Intent
 import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.model.CalendarSystem
@@ -51,11 +52,11 @@ class AndroidReminderSchedulerTest {
     fun `enabled offsets schedule unique exact alarms at local 09 00`() = runBlocking {
         val result = scheduler().replace(42)
 
-        assertEquals(ReminderScheduleResult.Scheduled(3), result)
+        assertEquals(ReminderScheduleResult.Scheduled(4), result)
         val scheduled = alarms.scheduledAlarms.sortedBy { it.triggerAtTime }
-        assertEquals(3, scheduled.size)
+        assertEquals(4, scheduled.size)
         assertEquals(
-            listOf(14, 7, 3),
+            listOf(14, 7, 3, 0),
             scheduled.map { shadowOf(it.operation).savedIntent.getIntExtra(ReminderReceiver.EXTRA_OFFSET, -1) },
         )
         assertEquals(
@@ -63,6 +64,7 @@ class AndroidReminderSchedulerTest {
                 LocalDate.of(2026, 7, 23),
                 LocalDate.of(2026, 7, 30),
                 LocalDate.of(2026, 8, 3),
+                LocalDate.of(2026, 8, 6),
             ).map { it.atTime(9, 0).atZone(zone).toInstant().toEpochMilli() },
             scheduled.map { it.triggerAtTime },
         )
@@ -72,11 +74,12 @@ class AndroidReminderSchedulerTest {
     }
 
     @Test
-    fun `past reminder dates are skipped`() = runBlocking {
+    fun `past optional reminder dates are skipped but day of remains`() = runBlocking {
         records = listOf(day(month = 7, date = 15))
 
-        assertEquals(ReminderScheduleResult.Scheduled(0), scheduler().replace(42))
-        assertTrue(alarms.scheduledAlarms.isEmpty())
+        assertEquals(ReminderScheduleResult.Scheduled(1), scheduler().replace(42))
+        assertEquals(0, shadowOf(alarms.scheduledAlarms.single().operation).savedIntent
+            .getIntExtra(ReminderReceiver.EXTRA_OFFSET, -1))
     }
 
     @Test
@@ -87,10 +90,10 @@ class AndroidReminderSchedulerTest {
 
         scheduler.replace(42)
 
-        assertEquals(1, alarms.scheduledAlarms.size)
+        assertEquals(2, alarms.scheduledAlarms.size)
         assertEquals(
             7,
-            shadowOf(alarms.scheduledAlarms.single().operation)
+            shadowOf(alarms.scheduledAlarms.minBy { it.triggerAtTime }.operation)
                 .savedIntent.getIntExtra(ReminderReceiver.EXTRA_OFFSET, -1),
         )
     }
@@ -104,10 +107,22 @@ class AndroidReminderSchedulerTest {
     }
 
     @Test
-    fun `a day with no selected reminders schedules nothing`() = runBlocking {
+    fun `a day with no selected optional reminders still schedules day of`() = runBlocking {
         records = listOf(day(reminders = emptySet()))
 
-        assertEquals(ReminderScheduleResult.Scheduled(0), scheduler().replace(42))
+        assertEquals(ReminderScheduleResult.Scheduled(1), scheduler().replace(42))
+        assertEquals(0, shadowOf(alarms.scheduledAlarms.single().operation).savedIntent
+            .getIntExtra(ReminderReceiver.EXTRA_OFFSET, -1))
+    }
+
+    @Test
+    fun `rebuilding after nine on occurrence day dispatches immediate day of reminder`() = runBlocking {
+        records = listOf(day(month = 7, date = 14, reminders = emptySet()))
+        val dispatched = mutableListOf<Intent>()
+        val afterNine = Clock.fixed(Instant.parse("2026-07-14T02:00:00Z"), zone)
+
+        assertEquals(ReminderScheduleResult.Scheduled(0), scheduler(afterNine, dispatched::add).replace(42))
+        assertEquals(listOf(0), dispatched.map { it.getIntExtra(ReminderReceiver.EXTRA_OFFSET, -1) })
         assertTrue(alarms.scheduledAlarms.isEmpty())
     }
 
@@ -117,15 +132,19 @@ class AndroidReminderSchedulerTest {
         scheduler.rebuildAll()
         scheduler.rebuildAll()
 
-        assertEquals(3, alarms.scheduledAlarms.size)
+        assertEquals(4, alarms.scheduledAlarms.size)
     }
 
-    private fun scheduler() = AndroidReminderScheduler(
+    private fun scheduler(
+        schedulerClock: Clock = clock,
+        immediateDispatcher: (Intent) -> Unit = {},
+    ) = AndroidReminderScheduler(
         context = context,
         loadDay = { id -> records.singleOrNull { it.id == id } },
         loadAllDays = { records },
         calculator = DateOccurrenceCalculator(SolarOnlyConverter),
-        clock = clock,
+        clock = schedulerClock,
+        immediateDispatcher = immediateDispatcher,
     )
 
     private fun day(

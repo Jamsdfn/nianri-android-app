@@ -40,6 +40,7 @@ class ReminderReceiverTest {
             .grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         notifications = context.getSystemService(NotificationManager::class.java)
         notifications.cancelAll()
+        context.getSharedPreferences("day_of_reminder_delivery", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
     @Test
@@ -71,6 +72,27 @@ class ReminderReceiverTest {
 
         assertFalse(service(LocalDate.of(2026, 7, 30)).deliver(42, 7))
         assertTrue(shadowOf(notifications).allNotifications.isEmpty())
+    }
+
+    @Test
+    fun `day of reminder is mandatory and delivered only once per occurrence date`() = runBlocking {
+        day = standardDay().copy(reminders = emptySet())
+        val service = service(LocalDate.of(2026, 8, 6))
+
+        assertTrue(service.deliver(42, 0))
+        assertFalse(service.deliver(42, 0))
+        assertEquals(1, shadowOf(notifications).allNotifications.size)
+        assertEquals("妈妈生日就是今天 · 8月6日", shadowOf(shadowOf(notifications).allNotifications.single()).contentText)
+    }
+
+    @Test
+    fun `day of reminder can deliver again for next annual occurrence`() = runBlocking {
+        day = standardDay().copy(reminders = emptySet())
+
+        assertTrue(service(LocalDate.of(2026, 8, 6)).deliver(42, 0))
+        notifications.cancelAll()
+        assertTrue(service(LocalDate.of(2027, 8, 6)).deliver(42, 0))
+        assertEquals(1, shadowOf(notifications).allNotifications.size)
     }
 
     @Test

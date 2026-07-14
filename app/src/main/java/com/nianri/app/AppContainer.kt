@@ -11,6 +11,7 @@ import com.nianri.app.domain.WidgetUpdater
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.calendar.IcuCalendarConverter
 import com.nianri.app.reminder.AndroidReminderScheduler
+import com.nianri.app.reminder.DayOfReminderLedger
 import com.nianri.app.reminder.ReminderScheduler
 import com.nianri.app.widget.AndroidWidgetInstanceUpdater
 import com.nianri.app.widget.ConfiguredWidgetUpdater
@@ -35,6 +36,7 @@ class AppContainer(context: Context) {
     val occurrenceCalculator by lazy { DateOccurrenceCalculator(calendarConverter) }
     val importantDays by lazy { ImportantDayRepository(database) }
     val widgets by lazy { WidgetRepository(database) }
+    val dayOfReminderLedger by lazy { DayOfReminderLedger(applicationContext) }
     val reminderScheduler: ReminderScheduler by lazy {
         AndroidReminderScheduler(
             context = applicationContext,

@@ -5,6 +5,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.ListenableWorker
 import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.OneTimeWorkRequest
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.nianri.app.NianriApplication
 import java.time.Duration
@@ -43,3 +45,6 @@ fun reminderAuditRequest(): PeriodicWorkRequest = PeriodicWorkRequestBuilder<Rem
     repeatInterval = Duration.ofHours(24),
     flexTimeInterval = Duration.ofHours(2),
 ).build()
+
+fun reminderImmediateAuditRequest(): OneTimeWorkRequest =
+    OneTimeWorkRequestBuilder<ReminderAuditWorker>().build()

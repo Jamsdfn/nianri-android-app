@@ -129,6 +129,11 @@ fun EditDayScreen(
             )
 
             Text("提醒", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "当天 09:00 · 固定开启",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(14, 7, 3).forEach { offset ->
                     FilterChip(
