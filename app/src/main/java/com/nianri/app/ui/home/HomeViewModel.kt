@@ -1,0 +1,96 @@
+package com.nianri.app.ui.home
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.nianri.app.AppContainer
+import com.nianri.app.data.UiPreferences
+import com.nianri.app.domain.DayCardModel
+import com.nianri.app.domain.calendar.CalendarConverter
+import com.nianri.app.domain.model.CalendarSystem
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+data class HomeUiState(
+    val pinned: DayCardModel? = null,
+    val upcoming: List<DayCardModel> = emptyList(),
+    val showCalendarExplanation: Boolean = true,
+)
+
+class HomeViewModel(
+    cards: Flow<List<DayCardModel>>,
+    private val updateAppDisplay: suspend (Long, CalendarSystem) -> Unit,
+    private val converter: CalendarConverter,
+    private val uiPreferences: UiPreferences,
+) : ViewModel() {
+    private val displayOverrides = MutableStateFlow<Map<Long, CalendarSystem>>(emptyMap())
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        cards,
+        displayOverrides,
+        uiPreferences.calendarExplanationSeen,
+    ) { projectedCards, overrides, explanationSeen ->
+        val cardsWithOverrides = projectedCards.map { model ->
+            val display = overrides[model.day.id]
+            if (model is DayCardModel.Ready && display != null) {
+                model.copy(
+                    day = model.day.copy(appDisplay = display),
+                    displayedDate = converter.displayDate(model.occurrence.solarDate, display),
+                )
+            } else {
+                model
+            }
+        }
+        val pinned = cardsWithOverrides.firstOrNull { it.day.isPinned }
+        HomeUiState(
+            pinned = pinned,
+            upcoming = cardsWithOverrides.filterNot { it === pinned },
+            showCalendarExplanation = !explanationSeen,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = HomeUiState(
+            showCalendarExplanation = !uiPreferences.calendarExplanationSeen.value,
+        ),
+    )
+
+    fun toggleDisplay(dayId: Long) {
+        val model = (listOfNotNull(uiState.value.pinned) + uiState.value.upcoming)
+            .firstOrNull { it.day.id == dayId }
+            ?: return
+        val display = when (model.day.appDisplay) {
+            CalendarSystem.SOLAR -> CalendarSystem.LUNAR
+            CalendarSystem.LUNAR -> CalendarSystem.SOLAR
+        }
+        displayOverrides.value = displayOverrides.value + (dayId to display)
+        viewModelScope.launch {
+            updateAppDisplay(dayId, display)
+        }
+    }
+
+    fun dismissCalendarExplanation() {
+        uiPreferences.markCalendarExplanationSeen()
+    }
+
+    class Factory(
+        private val container: AppContainer,
+        private val uiPreferences: UiPreferences,
+    ) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            require(modelClass.isAssignableFrom(HomeViewModel::class.java))
+            return HomeViewModel(
+                cards = container.dayListProjector.observeAll(),
+                updateAppDisplay = container.importantDays::updateAppDisplay,
+                converter = container.calendarConverter,
+                uiPreferences = uiPreferences,
+            ) as T
+        }
+    }
+}
