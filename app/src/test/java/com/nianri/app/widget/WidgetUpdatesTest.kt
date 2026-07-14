@@ -21,25 +21,32 @@ class WidgetUpdatesTest {
     private val context = RuntimeEnvironment.getApplication()
 
     @Test
-    fun `owning provider receives explicit update for only the requested id`() = runBlocking {
+    fun `owning Nianri providers await direct rendering without sending refresh broadcasts`() = runBlocking {
         val broadcasts = mutableListOf<Intent>()
-        val provider = ComponentName(context.packageName, "WideReceiver")
-        val updater = AndroidWidgetInstanceUpdater(
-            context = context,
-            providerResolver = { provider },
-            broadcastDispatcher = broadcasts::add,
+        val rendered = mutableListOf<Pair<Int, ComponentName>>()
+        val providers = listOf(
+            ComponentName(context, NianriWideWidgetReceiver::class.java),
+            ComponentName(context, NianriSquareWidgetReceiver::class.java),
         )
 
-        updater.update(701)
+        providers.forEachIndexed { index, provider ->
+            val updater = AndroidWidgetInstanceUpdater(
+                context = context,
+                providerResolver = { provider },
+                boundWidgetRenderer = BoundWidgetRenderer { appWidgetId, component ->
+                    rendered += appWidgetId to component
+                    true
+                },
+                broadcastDispatcher = broadcasts::add,
+            )
+            updater.update(701 + index)
+        }
 
-        assertEquals(1, broadcasts.size)
-        assertEquals(AppWidgetManager.ACTION_APPWIDGET_UPDATE, broadcasts.single().action)
-        assertEquals(provider, broadcasts.single().component)
-        assertNull(broadcasts.single().`package`)
-        assertArrayEquals(
-            intArrayOf(701),
-            broadcasts.single().getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS),
+        assertEquals(
+            listOf(701 to providers[0], 702 to providers[1]),
+            rendered,
         )
+        assertTrue(broadcasts.isEmpty())
     }
 
     @Test

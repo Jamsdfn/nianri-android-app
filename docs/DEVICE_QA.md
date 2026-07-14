@@ -30,7 +30,7 @@ API 26 构建指纹：`google/sdk_gphone_arm64/generic_arm64:8.0.0/OSR1.180418.0
 - API 26：依赖 API 29 `UiAutomation.adoptShellPermissionIdentity` 的系统生命周期测试用 `@SdkSuppress(minSdkVersion = 29)` 明确能力边界。1.3 倍字体下，2×1 第二行辅助文字从 8.5sp 调至 8sp；API 26 的旧版 RemoteViews 在 2.0 字体下无法可靠容纳第二行，因此只在该系统与字号组合隐藏日期/切换行，保留产品要求的名称和剩余天数。正常字体、1.3 倍字体以及 API 31+ 仍展示日期与切换。
 - API 37.1：传递解析的 Espresso 3.5.0 会反射调用已移除的 `InputManager.getInstance()`；显式升级到 Espresso 3.7.0 后恢复正常。
 
-2026-07-14 最新复验结果：`testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest` 为 `BUILD SUCCESSFUL`；完整 instrumentation 在 API 26 为 73/73，在 API 31、API 36、API 37.1 各为 74/74。API 26 被排除的 1 项只验证 API 29+ 才提供的系统测试能力，不是产品功能缺失。
+2026-07-14 最新复验结果：`testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest` 为 `BUILD SUCCESSFUL`；完整 instrumentation 在 API 26 为 73/73，在 API 31、API 36、API 37.1 各为 75/75。API 26 被排除的 2 项只验证 API 29+ 才提供的系统宿主能力，不是产品功能缺失。
 
 ## 自动化覆盖
 
@@ -61,17 +61,17 @@ Task 10 的 `EndToEndTest` 使用真实 Room repository、`DayMutationCoordinato
 
 ## 小米 15 Pro / HyperOS 3.0.304.0 真机清单
 
-当前 ADB 仅连接 Android 模拟器，未连接用户的小米 15 Pro。以下全部保持 `PENDING / PHYSICAL`：
+ADB 已无线连接用户的小米 15 Pro，并完成保留数据的覆盖安装。用户已在 HyperOS 桌面确认本轮小部件即时切换和一次配置流程成功；未实际执行的项目继续保持待验证。
 
 | 检查项 | 状态 | 真机步骤 |
 |---|---|---|
-| 无线配对、重连、覆盖安装 | `PENDING / PHYSICAL` | 按 `docs/DEVELOPMENT.md` 执行 `adb pair`、`adb connect`、`adb install -r`，确认 `adb devices -l` 出现真实设备且非 `offline`。 |
+| 无线配对、重连、覆盖安装 | `PASS / PHYSICAL` | 小米 15 Pro 已连接并多次 `adb install -r` 成功，用户数据与已有小部件保留。 |
 | 2×1 比例与系统标签 | `PENDING / PHYSICAL` | 在 HyperOS 桌面添加 2×1，与用户截图“主卧灯”占格和高度并排比较；确认卡片下方由系统显示“念日”，两行文字不裁切。 |
 | 2×2 比例与系统标签 | `PENDING / PHYSICAL` | 与用户截图“天气”小部件占格比较；确认名称、倒数、完整日期、紧凑切换和卡片下方“念日”。 |
-| 独立选择与展示 | `PENDING / PHYSICAL` | 添加两个实例，分别选择不同日子和显示历法；点日期只改变写法，剩余天数和目标不变。 |
+| 联动选择与展示 | `PASS / PHYSICAL` | 用户确认：点击日期/图标后小部件可见日期即时切换且 App 同步；新建/编辑选择一次并保存后回桌面，直接显示所选日子。 |
 | 删除与换选 | `PENDING / PHYSICAL` | 删除被一个实例引用的日子，确认显示“这个日子已删除 / 点按选择其他日子”；点按后在原桌面位置改选。 |
 | 字体放大 | `PENDING / PHYSICAL` | 系统字体依次默认、较大、最大；确认核心名称/倒数/日期不裁切，辅助标签允许隐藏。 |
-| 通知和闹钟权限 | `PENDING / PHYSICAL` | 三个提醒全关时不请求；开启后依次检查通知权限和“闹钟和提醒”；拒绝/撤销显示“提醒未生效”，重新授权后恢复。 |
+| 通知和闹钟权限 | `PENDING / PHYSICAL` | 当天 09:00 固定提醒始终需要权限；14/7/3 可独立关闭。依次检查通知权限和“闹钟和提醒”，拒绝/撤销时显示“提醒未生效”。 |
 | HyperOS 省电策略 | `PENDING / PHYSICAL` | 在应用电池设置查看“不限制”选项和通知说明；产品不强制自启动。记录实际设置。 |
 | 重启、日期与时区 | `PENDING / PHYSICAL` | 至少配置一条提醒及两个小部件，重启并切换时区/日期后确认倒数、小部件与闹钟计划重建。恢复自动日期/时区。 |
 | 上午 9:00 到点投递 | `PENDING / MANUAL TIME` | 配置能在 14/7/3 天窗口命中的记录，保持本地时间自然运行到 09:00；记录通知时间、日期文字和特殊调整说明。 |
@@ -81,6 +81,6 @@ Task 10 的 `EndToEndTest` 使用真实 Room repository、`DayMutationCoordinato
 - merged manifest 审计未发现 `android.permission.INTERNET` 或 `android.permission.USE_EXACT_ALARM`；应用自身仅声明通知、精确闹钟和开机恢复能力。
 - 交付 APK 是 debug APK，不是商店签名 release 包。
 - APK：`app/build/outputs/apk/debug/app-debug.apk`
-- 最终产品兼容修复提交：`e137871`；最终测试提交：`e7c6523`
-- 当前 debug APK SHA-256：`3de9fac5e6457da11203c7080990cc23848cfc59e7ac93be8030f1154f58e7fc`
+- 本轮小部件即时交互修复记录在 `feature/nianri-app` 分支最新提交。
+- 当前 debug APK SHA-256：`278115143621e52e1d8a3ed9cf3ba57edab5eec2d1465d9e1ac5c3c9578ffa96`
 - 最终 clean gate：`PASS / AUTOMATED`。四版本设备测试、单元测试、Lint 和 debug APK 构建全部通过。

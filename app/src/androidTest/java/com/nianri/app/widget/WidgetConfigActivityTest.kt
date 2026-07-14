@@ -138,6 +138,7 @@ class WidgetConfigActivityTest {
         waitForText("原日子")
         compose.onNodeWithTag("widget-day-$first").assertIsSelected()
         compose.onNodeWithText("新日子").performClick()
+        compose.onNodeWithTag("widget-day-$second").assertIsSelected()
         compose.onNodeWithTag("widget-config-save").performClick()
 
         assertEquals(Activity.RESULT_OK, scenario.result.resultCode)

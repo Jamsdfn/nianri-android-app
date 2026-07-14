@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import com.nianri.app.data.WidgetRepository
 import com.nianri.app.domain.WidgetUpdater
 import com.nianri.app.domain.model.CalendarSystem
@@ -13,11 +14,36 @@ fun interface WidgetInstanceUpdater {
     suspend fun update(appWidgetId: Int)
 }
 
+fun interface BoundWidgetRenderer {
+    suspend fun update(appWidgetId: Int, provider: ComponentName): Boolean
+}
+
+class GlanceBoundWidgetRenderer(context: Context) : BoundWidgetRenderer {
+    private val applicationContext = context.applicationContext
+    private val glanceManager = GlanceAppWidgetManager(applicationContext)
+
+    override suspend fun update(appWidgetId: Int, provider: ComponentName): Boolean {
+        val glanceId = glanceManager.getGlanceIdBy(appWidgetId)
+        return when (provider.className) {
+            NianriWideWidgetReceiver::class.java.name -> {
+                NianriWideWidget().refreshNianriWidget(applicationContext, glanceId)
+                true
+            }
+            NianriSquareWidgetReceiver::class.java.name -> {
+                NianriSquareWidget().refreshNianriWidget(applicationContext, glanceId)
+                true
+            }
+            else -> false
+        }
+    }
+}
+
 class AndroidWidgetInstanceUpdater(
     context: Context,
     private val providerResolver: (Int) -> ComponentName? = {
         AppWidgetManager.getInstance(context.applicationContext).getAppWidgetInfo(it)?.provider
     },
+    private val boundWidgetRenderer: BoundWidgetRenderer = GlanceBoundWidgetRenderer(context),
     private val broadcastDispatcher: (Intent) -> Unit = context.applicationContext::sendBroadcast,
 ) : WidgetInstanceUpdater {
     private val applicationContext = context.applicationContext
@@ -28,8 +54,9 @@ class AndroidWidgetInstanceUpdater(
         val provider = providerResolver(appWidgetId)
         when {
             provider == null -> update.setPackage(applicationContext.packageName)
-            provider.packageName == applicationContext.packageName -> update.component = provider
-            else -> return
+            provider.packageName != applicationContext.packageName -> return
+            boundWidgetRenderer.update(appWidgetId, provider) -> return
+            else -> update.component = provider
         }
         broadcastDispatcher(update)
     }

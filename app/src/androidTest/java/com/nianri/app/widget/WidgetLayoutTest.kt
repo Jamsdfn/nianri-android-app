@@ -31,6 +31,7 @@ import java.io.FileOutputStream
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -168,6 +169,72 @@ class WidgetLayoutTest {
                     delay(25)
                 }
             }
+        } finally {
+            runCatching { host.deleteAppWidgetId(appWidgetId) }
+            host.stopListening()
+            uiAutomation.dropShellPermissionIdentity()
+        }
+        container.database.clearAllTables()
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 29)
+    fun linkedDisplayToggleReplacesVisibleRemoteViewsInActiveHost() = runBlocking {
+        val container = (context as NianriApplication).container
+        container.database.clearAllTables()
+        val dayId = container.importantDays.save(
+            ImportantDay(
+                name = "实时联动测试",
+                basis = CalendarSystem.SOLAR,
+                month = 8,
+                day = 6,
+                appDisplay = CalendarSystem.SOLAR,
+            ),
+        )
+        val host = AppWidgetHost(context, 9_905)
+        val manager = AppWidgetManager.getInstance(context)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val uiAutomation = instrumentation.uiAutomation
+        uiAutomation.adoptShellPermissionIdentity(android.Manifest.permission.BIND_APPWIDGET)
+        val appWidgetId = host.allocateAppWidgetId()
+        try {
+            assertTrue(
+                manager.bindAppWidgetIdIfAllowed(
+                    appWidgetId,
+                    ComponentName(context, NianriWideWidgetReceiver::class.java),
+                ),
+            )
+            container.widgets.select(appWidgetId, dayId, CalendarSystem.SOLAR)
+            lateinit var hostView: android.appwidget.AppWidgetHostView
+            instrumentation.runOnMainSync {
+                host.startListening()
+                hostView = host.createView(context, appWidgetId, manager.getAppWidgetInfo(appWidgetId))
+            }
+
+            fun visibleTexts(): List<String> {
+                var texts = emptyList<String>()
+                instrumentation.runOnMainSync {
+                    texts = hostView.textViews().map { it.text.toString() }
+                }
+                return texts
+            }
+
+            container.widgetInstanceUpdater.update(appWidgetId)
+            val initialRendered = withTimeoutOrNull(5_000) {
+                while (visibleTexts().none { "↻" in it }) delay(25)
+                true
+            } ?: false
+            assertTrue("initial host texts=${visibleTexts()}", initialRendered)
+            val initialDateControl = visibleTexts().single { "↻" in it }
+
+            container.linkedDisplayController.toggle(appWidgetId)
+
+            val toggledRendered = withTimeoutOrNull(5_000) {
+                while (visibleTexts().none { "↻" in it && it != initialDateControl }) delay(25)
+                true
+            } ?: false
+            assertTrue("toggled host texts=${visibleTexts()}", toggledRendered)
+            assertEquals(CalendarSystem.LUNAR, container.importantDays.get(dayId)?.appDisplay)
         } finally {
             runCatching { host.deleteAppWidgetId(appWidgetId) }
             host.stopListening()

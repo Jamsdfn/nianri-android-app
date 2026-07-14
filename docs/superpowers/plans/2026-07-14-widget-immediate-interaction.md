@@ -4,7 +4,7 @@
 
 **Goal:** Make calendar-display toggles and widget configuration visibly take effect before their user action completes.
 
-**Architecture:** Keep Room `appDisplay` as the linked source of truth and retain the existing non-overlapping date-row action. Replace fire-and-forget provider broadcasts for bound Nianri widgets with awaited `GlanceAppWidget.update` calls selected by provider component; retain the package broadcast only for an unbound/unknown safe fallback.
+**Architecture:** Keep Room `appDisplay` as the linked source of truth and retain the existing non-overlapping date-row action. Before each awaited Glance update, regenerate the instance model from Room and write it to Glance Preferences so active compositions observe new data instead of a captured initial model. Keep configuration in the launcher task with an empty task affinity.
 
 **Tech Stack:** Kotlin, Android AppWidgetManager, Jetpack Glance 1.1.1, Room, Robolectric, Android instrumentation.
 
@@ -24,7 +24,7 @@
 - Modify: `app/src/test/java/com/nianri/app/widget/WidgetUpdatesTest.kt`
 
 **Interfaces:**
-- Consumes: `AppWidgetManager.getAppWidgetInfo(id).provider` and `AppWidgetId(id)`.
+- Consumes: `AppWidgetManager.getAppWidgetInfo(id).provider` and `GlanceAppWidgetManager.getGlanceIdBy(id)`.
 - Produces: `BoundWidgetRenderer.update(appWidgetId: Int, provider: ComponentName): Boolean`; `AndroidWidgetInstanceUpdater.update` returns only after a recognized Nianri widget has rendered.
 
 - [ ] **Step 1: Write the failing tests**
@@ -39,11 +39,11 @@ Expected: compilation/test failure because `BoundWidgetRenderer` and the direct-
 
 - [ ] **Step 3: Implement the minimal direct renderer**
 
-Add a renderer whose `when (provider.className)` branches call:
+Add a renderer whose provider branches first synchronize `WidgetGlanceState`, then call:
 
 ```kotlin
-NianriWideWidget().update(context, AppWidgetId(appWidgetId))
-NianriSquareWidget().update(context, AppWidgetId(appWidgetId))
+NianriWideWidget().refreshNianriWidget(context, glanceId)
+NianriSquareWidget().refreshNianriWidget(context, glanceId)
 ```
 
 Return `true` for recognized receiver classes and `false` otherwise. In `AndroidWidgetInstanceUpdater`, reject foreign providers, await the renderer for recognized bound widgets, and use the existing package/explicit broadcast only when no direct renderer handles the ID.
@@ -56,7 +56,8 @@ Run the Task 1 command. Expected: `WidgetUpdatesTest` passes.
 
 **Files:**
 - Modify: `app/src/androidTest/java/com/nianri/app/widget/WidgetConfigActivityTest.kt`
-- Verify: `app/src/androidTest/java/com/nianri/app/widget/WidgetLayoutTest.kt`
+- Modify: `app/src/androidTest/java/com/nianri/app/widget/WidgetLayoutTest.kt`
+- Modify: `app/src/main/AndroidManifest.xml`
 - Modify: `docs/DEVICE_QA.md`
 
 **Interfaces:**
@@ -66,6 +67,8 @@ Run the Task 1 command. Expected: `WidgetUpdatesTest` passes.
 - [ ] **Step 1: Add a configuration regression test**
 
 Add a test that selects a different day once, presses `widget-config-save` once, and verifies both `RESULT_OK` and the resolved target day. Keep `primaryContentOpensDetailAndFullWidthDateRowOwnsToggle` as the date/icon hit-area contract.
+
+Add a bound `AppWidgetHost` test that records the initial visible date control, toggles the linked display once, and waits for a different visible control. Declare the configuration activity with `android:taskAffinity=""` and `android:excludeFromRecents="true"` so `finish()` returns to the launcher.
 
 - [ ] **Step 2: Run focused instrumentation**
 
