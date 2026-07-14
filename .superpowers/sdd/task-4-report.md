@@ -90,3 +90,35 @@ Result: `BUILD SUCCESSFUL`; 23 tests, 0 skipped, 0 failures, 0 errors.
 - `CurrentSystemZoneClock.getZone()` resolves the current supplied system zone on every projection; one live projector changes its computed `today` after a zone change.
 - Known `CalendarOperationException` and `DateTimeException` failures produce `Unavailable`.
 - An unrelated `NullPointerException` propagates rather than being hidden as unavailable.
+
+## Final ICU conversion-boundary follow-up
+
+`IcuCalendarConverter` now exposes an internal injectable `ChineseCalendar` provider for same-package tests while its public default constructor continues to create a UTC calendar. Date-to-epoch calculation happens outside the protected boundary. Only `IllegalArgumentException` from provider creation, `timeInMillis`, or ICU field reads is translated to `CalendarConversionException`, preserving the cause and solar-date context. `NullPointerException`, `IndexOutOfBoundsException`, and formatter invariant defects are not caught.
+
+### Final follow-up RED
+
+Exact command:
+
+```text
+ANDROID_HOME=/Users/alexander/Library/Android/sdk ./gradlew testDebugUnitTest --tests '*IcuCalendarConverterTest' --tests '*DayListProjectorTest'
+```
+
+Result: `BUILD FAILED` during test compilation with `Too many arguments for constructor(): IcuCalendarConverter`, confirming the injectable production-converter boundary was missing.
+
+### Final follow-up GREEN
+
+Exact focused command:
+
+```text
+ANDROID_HOME=/Users/alexander/Library/Android/sdk ./gradlew testDebugUnitTest --tests '*IcuCalendarConverterTest' --tests '*DayListProjectorTest'
+```
+
+Result: `BUILD SUCCESSFUL`; 11 focused tests, 0 failures. This includes all four existing known-date/display tests, two new provider-failure tests, and five projector tests.
+
+Exact full-suite command:
+
+```text
+ANDROID_HOME=/Users/alexander/Library/Android/sdk ./gradlew testDebugUnitTest
+```
+
+Result: `BUILD SUCCESSFUL`; 25 tests, 0 skipped, 0 failures, 0 errors.

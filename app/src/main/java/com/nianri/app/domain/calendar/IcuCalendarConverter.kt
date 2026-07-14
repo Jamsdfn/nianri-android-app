@@ -8,18 +8,30 @@ import com.nianri.app.domain.model.LunarDate
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-class IcuCalendarConverter : CalendarConverter {
+class IcuCalendarConverter internal constructor(
+    private val calendarProvider: () -> ChineseCalendar,
+) : CalendarConverter {
+    constructor() : this({ ChineseCalendar(TimeZone.getTimeZone("UTC")) })
+
     override fun lunarFromSolar(solarDate: LocalDate): LunarDate {
-        val calendar = ChineseCalendar(TimeZone.getTimeZone("UTC"))
-        calendar.timeInMillis = solarDate
+        val epochMillis = solarDate
             .atTime(12, 0)
             .toInstant(ZoneOffset.UTC)
             .toEpochMilli()
-        return LunarDate(
-            month = calendar.get(ChineseCalendar.MONTH) + 1,
-            day = calendar.get(ChineseCalendar.DAY_OF_MONTH),
-            isLeapMonth = calendar.get(ChineseCalendar.IS_LEAP_MONTH) == 1,
-        )
+        return try {
+            val calendar = calendarProvider()
+            calendar.timeInMillis = epochMillis
+            LunarDate(
+                month = calendar.get(ChineseCalendar.MONTH) + 1,
+                day = calendar.get(ChineseCalendar.DAY_OF_MONTH),
+                isLeapMonth = calendar.get(ChineseCalendar.IS_LEAP_MONTH) == 1,
+            )
+        } catch (failure: IllegalArgumentException) {
+            throw CalendarConversionException(
+                message = "ICU could not convert solar date $solarDate to a lunar date",
+                cause = failure,
+            )
+        }
     }
 
     override fun displayDate(

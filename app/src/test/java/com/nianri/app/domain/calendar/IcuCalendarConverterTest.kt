@@ -4,6 +4,9 @@ import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.LunarDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -49,5 +52,30 @@ class IcuCalendarConverterTest {
             DisplayDate(CalendarSystem.LUNAR, "闰六月初一"),
             converter.displayDate(LocalDate.of(2025, 7, 25), CalendarSystem.LUNAR),
         )
+    }
+
+    @Test
+    fun `ICU illegal argument becomes conversion failure with cause and date context`() {
+        val cause = IllegalArgumentException("ICU unavailable")
+        val failingConverter = IcuCalendarConverter { throw cause }
+        val solarDate = LocalDate.of(2026, 2, 17)
+
+        val failure = assertThrows(CalendarConversionException::class.java) {
+            failingConverter.lunarFromSolar(solarDate)
+        }
+
+        assertSame(cause, failure.cause)
+        assertTrue(failure.message.orEmpty().contains(solarDate.toString()))
+    }
+
+    @Test
+    fun `provider programmer exception propagates`() {
+        val failingConverter = IcuCalendarConverter {
+            throw NullPointerException("programmer defect")
+        }
+
+        assertThrows(NullPointerException::class.java) {
+            failingConverter.lunarFromSolar(LocalDate.of(2026, 2, 17))
+        }
     }
 }
