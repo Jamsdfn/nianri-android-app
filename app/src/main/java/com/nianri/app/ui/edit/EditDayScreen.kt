@@ -46,6 +46,7 @@ import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.domain.model.Occurrence
+import com.nianri.app.reminder.ReminderPermissionState
 import com.nianri.app.ui.theme.NianriTheme
 import com.nianri.app.ui.countdownCopy
 import java.time.LocalDate
@@ -68,6 +69,9 @@ fun EditDayScreen(
     onDelete: () -> Unit,
     onSaved: (Long) -> Unit = {},
     onDeleted: () -> Unit = {},
+    onRequestNotificationPermission: () -> Unit = {},
+    onRequestExactAlarmPermission: () -> Unit = {},
+    onOpenReminderSettings: () -> Unit = {},
 ) {
     var showDateDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -135,7 +139,12 @@ fun EditDayScreen(
                     )
                 }
             }
-            PermissionStatusRow(state)
+            PermissionStatusRow(
+                state = state,
+                onRequestNotificationPermission = onRequestNotificationPermission,
+                onRequestExactAlarmPermission = onRequestExactAlarmPermission,
+                onOpenReminderSettings = onOpenReminderSettings,
+            )
 
             Row(
                 modifier = Modifier
@@ -241,15 +250,39 @@ private fun CalendarChoices(
 }
 
 @Composable
-private fun PermissionStatusRow(state: EditDayUiState) {
-    val text = when {
-        state.reminders.isEmpty() -> "未开启提醒"
-        state.permissionStatus == ReminderPermissionStatus.GRANTED -> "通知与闹钟权限已就绪"
-        state.permissionStatus == ReminderPermissionStatus.DENIED -> "提醒权限未生效"
-        else -> "保存时将申请通知与闹钟权限"
+private fun PermissionStatusRow(
+    state: EditDayUiState,
+    onRequestNotificationPermission: () -> Unit,
+    onRequestExactAlarmPermission: () -> Unit,
+    onOpenReminderSettings: () -> Unit,
+) {
+    val text = when (state.permissionStatus) {
+        ReminderPermissionState.NotNeeded -> "未开启提醒"
+        ReminderPermissionState.WaitingForNotificationPermission -> "等待通知授权"
+        ReminderPermissionState.WaitingForExactAlarmPermission -> "等待闹钟和提醒授权"
+        ReminderPermissionState.Denied -> "提醒未生效"
+        ReminderPermissionState.Ready -> "通知与闹钟权限已就绪"
     }
     Card(modifier = Modifier.fillMaxWidth()) {
-        Text(text, modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium)
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(text, style = MaterialTheme.typography.bodyMedium)
+            if (state.permissionStatus != ReminderPermissionState.NotNeeded) {
+                Text(
+                    "小米手机可在系统设置检查通知与省电限制，无需开启自启动",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            when (state.permissionStatus) {
+                ReminderPermissionState.WaitingForNotificationPermission ->
+                    TextButton(onClick = onRequestNotificationPermission) { Text("授权通知") }
+                ReminderPermissionState.WaitingForExactAlarmPermission ->
+                    TextButton(onClick = onRequestExactAlarmPermission) { Text("开启闹钟和提醒") }
+                ReminderPermissionState.Denied ->
+                    TextButton(onClick = onOpenReminderSettings) { Text("打开系统设置") }
+                ReminderPermissionState.NotNeeded, ReminderPermissionState.Ready -> Unit
+            }
+        }
     }
 }
 

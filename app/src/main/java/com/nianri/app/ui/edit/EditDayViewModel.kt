@@ -11,6 +11,9 @@ import com.nianri.app.domain.calendar.CalendarOperationException
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.ImportantDay
+import com.nianri.app.reminder.AndroidReminderPermissionController
+import com.nianri.app.reminder.ReminderPermissionController
+import com.nianri.app.reminder.ReminderPermissionState
 import java.time.Clock
 import java.time.DateTimeException
 import java.time.LocalDate
@@ -21,12 +24,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-enum class ReminderPermissionStatus {
-    PENDING_CHECK,
-    GRANTED,
-    DENIED,
-}
 
 data class EditDayUiState(
     val id: Long = 0,
@@ -41,7 +38,7 @@ data class EditDayUiState(
     val nameError: String? = null,
     val dateError: String? = null,
     val activePicker: CalendarSystem = CalendarSystem.SOLAR,
-    val permissionStatus: ReminderPermissionStatus = ReminderPermissionStatus.PENDING_CHECK,
+    val permissionStatus: ReminderPermissionState = ReminderPermissionState.WaitingForNotificationPermission,
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val savedId: Long? = null,
@@ -59,8 +56,11 @@ class EditDayViewModel(
     private val calculator: DateOccurrenceCalculator,
     private val converter: CalendarConverter,
     private val clock: Clock,
+    private val permissionController: ReminderPermissionController,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(EditDayUiState(id = dayId, isLoading = dayId != 0L))
+    private val mutableState = MutableStateFlow(
+        EditDayUiState(id = dayId, isLoading = dayId != 0L).withPermissionState(),
+    )
     val uiState: StateFlow<EditDayUiState> = mutableState.asStateFlow()
 
     init {
@@ -71,7 +71,7 @@ class EditDayViewModel(
                 mutableState.value = if (day == null) {
                     mutableState.value.copy(isLoading = false, operationError = "未找到这个日子")
                 } else {
-                    day.toUiState().copy(widgetReferences = widgetReferences).withPreview()
+                    day.toUiState().copy(widgetReferences = widgetReferences).withPreview().withPermissionState()
                 }
             }
         }
@@ -97,6 +97,22 @@ class EditDayViewModel(
     }
 
     fun setPinned(pinned: Boolean) = mutate { copy(pinned = pinned) }
+
+    fun notificationPermissionRequestStarted() {
+        if (mutableState.value.reminders.isEmpty()) return
+        permissionController.notificationRequestStarted()
+        refreshPermissionState()
+    }
+
+    fun exactAlarmPermissionRequestStarted() {
+        if (mutableState.value.reminders.isEmpty()) return
+        permissionController.exactAlarmRequestStarted()
+        refreshPermissionState()
+    }
+
+    fun refreshPermissionState() {
+        mutableState.update { it.withPermissionState() }
+    }
 
     fun clearOperationError() {
         mutableState.update { it.copy(operationError = null) }
@@ -141,8 +157,12 @@ class EditDayViewModel(
     }
 
     private fun mutate(transform: EditDayUiState.() -> EditDayUiState) {
-        mutableState.update { it.transform().withPreview() }
+        mutableState.update { it.transform().withPreview().withPermissionState() }
     }
+
+    private fun EditDayUiState.withPermissionState() = copy(
+        permissionStatus = permissionController.state(reminders.isNotEmpty()),
+    )
 
     private fun EditDayUiState.withPreview(): EditDayUiState {
         if (validate(this) != null) return copy(preview = null)
@@ -217,6 +237,7 @@ class EditDayViewModel(
                 calculator = container.occurrenceCalculator,
                 converter = container.calendarConverter,
                 clock = CurrentSystemZoneClock(),
+                permissionController = AndroidReminderPermissionController(container.applicationContext),
             ) as T
         }
     }

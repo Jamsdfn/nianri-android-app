@@ -6,6 +6,8 @@ import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.domain.model.LunarDate
+import com.nianri.app.reminder.ReminderPermissionController
+import com.nianri.app.reminder.ReminderPermissionState
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -92,6 +94,29 @@ class EditDayViewModelTest {
     }
 
     @Test
+    fun `permission state follows whether any reminder is selected`() {
+        val permissions = FakePermissionController(ReminderPermissionState.WaitingForNotificationPermission)
+        val viewModel = viewModel(permissions = permissions)
+
+        assertEquals(ReminderPermissionState.WaitingForNotificationPermission, viewModel.uiState.value.permissionStatus)
+        listOf(14, 7, 3).forEach(viewModel::toggleReminder)
+        assertEquals(ReminderPermissionState.NotNeeded, viewModel.uiState.value.permissionStatus)
+    }
+
+    @Test
+    fun `permission request attempts are recorded and state refreshes`() {
+        val permissions = FakePermissionController(ReminderPermissionState.WaitingForNotificationPermission)
+        val viewModel = viewModel(permissions = permissions)
+
+        viewModel.notificationPermissionRequestStarted()
+        permissions.current = ReminderPermissionState.Denied
+        viewModel.refreshPermissionState()
+
+        assertEquals(1, permissions.notificationStarts)
+        assertEquals(ReminderPermissionState.Denied, viewModel.uiState.value.permissionStatus)
+    }
+
+    @Test
     fun `preview keeps countdown basis separate from displayed calendar`() {
         val viewModel = viewModel()
         viewModel.setName("妈妈生日")
@@ -150,7 +175,10 @@ class EditDayViewModelTest {
         assertTrue(viewModel.uiState.value.deleted)
     }
 
-    private fun viewModel(existing: ImportantDay? = null) = EditDayViewModel(
+    private fun viewModel(
+        existing: ImportantDay? = null,
+        permissions: ReminderPermissionController = FakePermissionController(ReminderPermissionState.Ready),
+    ) = EditDayViewModel(
         dayId = existing?.id ?: 0,
         loadDay = { existing },
         saveDay = {
@@ -161,6 +189,7 @@ class EditDayViewModelTest {
         calculator = DateOccurrenceCalculator(converter),
         converter = converter,
         clock = clock,
+        permissionController = permissions,
     )
 
     private fun day(
@@ -183,5 +212,23 @@ class EditDayViewModelTest {
 
         override fun displayDate(solarDate: LocalDate, calendarSystem: CalendarSystem) =
             DisplayDate(calendarSystem, "${if (calendarSystem == CalendarSystem.SOLAR) "新历" else "农历"}$solarDate")
+    }
+
+    private class FakePermissionController(
+        var current: ReminderPermissionState,
+    ) : ReminderPermissionController {
+        var notificationStarts = 0
+        var exactStarts = 0
+
+        override fun state(hasReminders: Boolean): ReminderPermissionState =
+            if (hasReminders) current else ReminderPermissionState.NotNeeded
+
+        override fun notificationRequestStarted() {
+            notificationStarts += 1
+        }
+
+        override fun exactAlarmRequestStarted() {
+            exactStarts += 1
+        }
     }
 }

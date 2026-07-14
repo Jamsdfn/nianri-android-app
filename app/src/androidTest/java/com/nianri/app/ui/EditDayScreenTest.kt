@@ -13,6 +13,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.nianri.app.domain.DayCardModel
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.DisplayDate
@@ -20,6 +23,7 @@ import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.domain.model.Occurrence
 import com.nianri.app.ui.edit.EditDayScreen
 import com.nianri.app.ui.edit.EditDayUiState
+import com.nianri.app.reminder.ReminderPermissionState
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,7 +62,10 @@ class EditDayScreenTest {
         compose.onNodeWithText("提前 3 天").assertIsSelected()
         compose.onNodeWithText("还有 23 天").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("新历 2026年8月6日").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("保存时将申请通知与闹钟权限").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("等待通知授权").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("小米手机可在系统设置检查通知与省电限制，无需开启自启动")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
@@ -181,7 +188,10 @@ class EditDayScreenTest {
     fun allRemindersOffShowsHonestStatus() {
         compose.setContent {
             EditDayScreen(
-                state = state().copy(reminders = emptySet()),
+                state = state().copy(
+                    reminders = emptySet(),
+                    permissionStatus = ReminderPermissionState.NotNeeded,
+                ),
                 widgetReferences = 0,
                 onBack = {}, onNameChange = {}, onBasisChange = {},
                 onMonthChange = {}, onDayChange = {}, onDisplayChange = {},
@@ -190,6 +200,38 @@ class EditDayScreenTest {
         }
 
         compose.onNodeWithText("未开启提醒").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun permissionRowsExposeOnlyTheActionForTheirCurrentState() {
+        var notificationRequests = 0
+        var exactAlarmRequests = 0
+        var settingsRequests = 0
+        var permission: ReminderPermissionState by mutableStateOf(
+            ReminderPermissionState.WaitingForNotificationPermission,
+        )
+        compose.setContent {
+            EditDayScreen(
+                state = state().copy(permissionStatus = permission),
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = {}, onDisplayChange = {},
+                onToggleReminder = {}, onPinnedChange = {}, onSave = {}, onDelete = {},
+                onRequestNotificationPermission = { notificationRequests += 1 },
+                onRequestExactAlarmPermission = { exactAlarmRequests += 1 },
+                onOpenReminderSettings = { settingsRequests += 1 },
+            )
+        }
+
+        compose.onNodeWithText("授权通知").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, notificationRequests) }
+
+        compose.runOnIdle { permission = ReminderPermissionState.WaitingForExactAlarmPermission }
+        compose.onNodeWithText("开启闹钟和提醒").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, exactAlarmRequests) }
+
+        compose.runOnIdle { permission = ReminderPermissionState.Denied }
+        compose.onNodeWithText("打开系统设置").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, settingsRequests) }
     }
 
     @Test

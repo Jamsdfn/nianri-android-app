@@ -10,13 +10,15 @@ import com.nianri.app.domain.DayMutationCoordinator
 import com.nianri.app.domain.WidgetUpdater
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.calendar.IcuCalendarConverter
+import com.nianri.app.reminder.AndroidReminderScheduler
 import com.nianri.app.reminder.ReminderScheduler
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
+import kotlinx.coroutines.flow.first
 
 class AppContainer(context: Context) {
-    private val applicationContext = context.applicationContext
+    val applicationContext: Context = context.applicationContext
 
     val database: NianriDatabase by lazy {
         Room.databaseBuilder(
@@ -29,7 +31,15 @@ class AppContainer(context: Context) {
     val occurrenceCalculator by lazy { DateOccurrenceCalculator(calendarConverter) }
     val importantDays by lazy { ImportantDayRepository(database) }
     val widgets by lazy { WidgetRepository(database) }
-    val reminderScheduler: ReminderScheduler by lazy { DeferredReminderScheduler }
+    val reminderScheduler: ReminderScheduler by lazy {
+        AndroidReminderScheduler(
+            context = applicationContext,
+            loadDay = importantDays::get,
+            loadAllDays = { importantDays.observeAll().first() },
+            calculator = occurrenceCalculator,
+            clock = CurrentSystemZoneClock(),
+        )
+    }
     val widgetUpdater: WidgetUpdater by lazy { DeferredWidgetUpdater }
     val dayListProjector by lazy {
         DayListProjector(
@@ -57,18 +67,6 @@ class CurrentSystemZoneClock(
     override fun withZone(zone: ZoneId): Clock = instantSource.withZone(zone)
 
     override fun instant(): Instant = instantSource.instant()
-}
-
-internal data object DeferredReminderScheduler : ReminderScheduler {
-    override suspend fun replace(dayId: Long): Nothing = unwired()
-
-    override suspend fun cancel(dayId: Long): Nothing = unwired()
-
-    override suspend fun rebuildAll(): Nothing = unwired()
-
-    private fun unwired(): Nothing = throw IllegalStateException(
-        "ReminderScheduler adapter is not wired; Task 7 must provide the Android binding",
-    )
 }
 
 internal data object DeferredWidgetUpdater : WidgetUpdater {

@@ -1,18 +1,23 @@
 package com.nianri.app
 
+import com.nianri.app.reminder.AndroidReminderScheduler
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class AppContainerTest {
     @Test
-    fun `deferred reminder binding fails fast with its adapter name`() {
-        val failure = assertThrows(IllegalStateException::class.java) {
-            runBlocking { DeferredReminderScheduler.replace(42L) }
-        }
+    fun `container binds the Android reminder adapter`() {
+        val container = AppContainer(RuntimeEnvironment.getApplication())
 
-        assertTrue(failure.message.orEmpty().contains("ReminderScheduler"))
+        assertTrue(container.reminderScheduler is AndroidReminderScheduler)
     }
 
     @Test

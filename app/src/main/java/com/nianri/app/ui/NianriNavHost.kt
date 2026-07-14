@@ -1,10 +1,18 @@
 package com.nianri.app.ui
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -59,11 +67,22 @@ fun NianriNavHost(
                 },
             ),
         ) { backStackEntry ->
+            val context = LocalContext.current
             val dayId = backStackEntry.arguments?.getLong("dayId") ?: 0L
             val editViewModel: EditDayViewModel = viewModel(
                 factory = EditDayViewModel.Factory(dayId, container),
             )
             val state by editViewModel.uiState.collectAsStateWithLifecycle()
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { editViewModel.refreshPermissionState() }
+            val exactAlarmPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult(),
+            ) { editViewModel.refreshPermissionState() }
+            LifecycleResumeEffect(editViewModel) {
+                editViewModel.refreshPermissionState()
+                onPauseOrDispose { }
+            }
             EditDayScreen(
                 state = state,
                 onBack = {
@@ -91,6 +110,23 @@ fun NianriNavHost(
                 },
                 onDeleted = {
                     navigateHomeClearingStack()
+                },
+                onRequestNotificationPermission = {
+                    editViewModel.notificationPermissionRequestStarted()
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                },
+                onRequestExactAlarmPermission = {
+                    editViewModel.exactAlarmPermissionRequestStarted()
+                    exactAlarmPermissionLauncher.launch(
+                        Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                            .setData(Uri.parse("package:${context.packageName}")),
+                    )
+                },
+                onOpenReminderSettings = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.parse("package:${context.packageName}")),
+                    )
                 },
             )
         }

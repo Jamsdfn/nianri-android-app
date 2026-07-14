@@ -6,6 +6,7 @@ import com.nianri.app.data.local.NianriDatabase
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.reminder.ReminderScheduler
+import com.nianri.app.reminder.ReminderScheduleResult
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -75,8 +76,9 @@ class DayMutationCoordinatorTest {
         private val days: ImportantDayRepository,
         private val events: MutableList<String>,
     ) : ReminderScheduler {
-        override suspend fun replace(dayId: Long) {
+        override suspend fun replace(dayId: Long): ReminderScheduleResult {
             events += "replace:$dayId:${days.get(dayId)?.name}"
+            return ReminderScheduleResult.Scheduled(0)
         }
 
         override suspend fun cancel(dayId: Long) {

@@ -12,8 +12,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val application = application as NianriApplication
         val importantDayId = intent
-            .takeIf { it.hasExtra(IMPORTANT_DAY_ID) }
-            ?.getLongExtra(IMPORTANT_DAY_ID, 0L)
+            .takeIf { it.hasExtra(EXTRA_IMPORTANT_DAY_ID) }
+            ?.getLongExtra(EXTRA_IMPORTANT_DAY_ID, 0L)
         val uiPreferences = UiPreferences(this)
         setContent {
             NianriTheme {
@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private companion object {
-        const val IMPORTANT_DAY_ID = "importantDayId"
+    companion object {
+        const val EXTRA_IMPORTANT_DAY_ID = "importantDayId"
     }
 }
