@@ -7,7 +7,9 @@ import com.nianri.app.AppContainer
 import com.nianri.app.data.UiPreferences
 import com.nianri.app.domain.DayCardModel
 import com.nianri.app.domain.calendar.CalendarConverter
+import com.nianri.app.domain.calendar.CalendarOperationException
 import com.nianri.app.domain.model.CalendarSystem
+import java.time.DateTimeException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -62,14 +64,7 @@ class HomeViewModel(
     ) { projectedCards, overrides, explanationSeen, error ->
         val cardsWithOverrides = projectedCards.map { model ->
             val display = overrides[model.day.id]
-            if (model is DayCardModel.Ready && display != null) {
-                model.copy(
-                    day = model.day.copy(appDisplay = display),
-                    displayedDate = converter.displayDate(model.occurrence.solarDate, display),
-                )
-            } else {
-                model
-            }
+            if (display == null) model else model.withDisplayOverride(display)
         }
         val pinned = cardsWithOverrides.firstOrNull { it.day.isPinned }
         HomeUiState(
@@ -115,6 +110,25 @@ class HomeViewModel(
     fun dismissCalendarExplanation() {
         uiPreferences.markCalendarExplanationSeen()
     }
+
+    private fun DayCardModel.withDisplayOverride(display: CalendarSystem): DayCardModel =
+        when (this) {
+            is DayCardModel.Ready -> {
+                val overriddenDay = day.copy(appDisplay = display)
+                try {
+                    copy(
+                        day = overriddenDay,
+                        displayedDate = converter.displayDate(occurrence.solarDate, display),
+                    )
+                } catch (_: CalendarOperationException) {
+                    DayCardModel.Unavailable(overriddenDay)
+                } catch (_: DateTimeException) {
+                    DayCardModel.Unavailable(overriddenDay)
+                }
+            }
+
+            is DayCardModel.Unavailable -> copy(day = day.copy(appDisplay = display))
+        }
 
     class Factory(
         private val container: AppContainer,

@@ -27,15 +27,19 @@ import androidx.test.core.app.ActivityScenario
 import com.nianri.app.MainActivity
 import com.nianri.app.data.UiPreferences
 import com.nianri.app.domain.DayCardModel
+import com.nianri.app.domain.calendar.CalendarConversionException
+import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.IcuCalendarConverter
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.DisplayDate
 import com.nianri.app.domain.model.ImportantDay
+import com.nianri.app.domain.model.LunarDate
 import com.nianri.app.domain.model.Occurrence
 import com.nianri.app.ui.home.HomeScreen
 import com.nianri.app.ui.home.HomeUiState
 import com.nianri.app.ui.home.HomeViewModel
 import java.time.LocalDate
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
@@ -321,6 +325,83 @@ class HomeScreenTest {
     }
 
     @Test
+    fun converterFailureMakesCardUnavailableAndStateContinuesWithLaterSource() {
+        val original = readyDay(id = 11, name = "转换边界日", days = 40, pinned = true)
+        val cards = MutableStateFlow(listOf(original))
+        val converter = ControllableConverter()
+        val viewModel = HomeViewModel(
+            cards = cards,
+            updateAppDisplay = { _, _ -> },
+            converter = converter,
+            uiPreferences = UiPreferences(context),
+        )
+        composeRule.setContent {
+            val state by viewModel.uiState.collectAsState()
+            HomeScreen(state = state, onToggleDisplay = viewModel::toggleDisplay)
+        }
+        composeRule.waitUntil { viewModel.uiState.value.pinned != null }
+
+        composeRule.onNodeWithContentDescription("转换边界日切换为农历展示").performClick()
+
+        composeRule.waitUntil {
+            viewModel.uiState.value.pinned is DayCardModel.Unavailable
+        }
+        val unavailable = viewModel.uiState.value.pinned as DayCardModel.Unavailable
+        assertEquals(CalendarSystem.LUNAR, unavailable.day.appDisplay)
+
+        converter.failLunarDisplay = false
+        cards.value = listOf(original.withDisplay(CalendarSystem.LUNAR, "仓库恢复后的农历日期"))
+
+        composeRule.waitUntil {
+            (viewModel.uiState.value.pinned as? DayCardModel.Ready)
+                ?.displayedDate?.text == "仓库恢复后的农历日期"
+        }
+    }
+
+    @Test
+    fun unavailableCardOptimisticallySelectsDisplayAndRollsBackOnFailure() {
+        val releaseFailure = CompletableDeferred<Unit>()
+        val day = ImportantDay(
+            id = 19,
+            name = "暂不可用生日",
+            basis = CalendarSystem.LUNAR,
+            month = 8,
+            day = 30,
+            appDisplay = CalendarSystem.SOLAR,
+        )
+        val viewModel = HomeViewModel(
+            cards = MutableStateFlow(listOf(DayCardModel.Unavailable(day))),
+            updateAppDisplay = { _, _ ->
+                releaseFailure.await()
+                error("database unavailable")
+            },
+            converter = IcuCalendarConverter(),
+            uiPreferences = UiPreferences(context),
+        )
+        composeRule.setContent {
+            val state by viewModel.uiState.collectAsState()
+            HomeScreen(state = state, onToggleDisplay = viewModel::toggleDisplay)
+        }
+        composeRule.waitUntil { viewModel.uiState.value.upcoming.isNotEmpty() }
+
+        composeRule.onNodeWithContentDescription("暂不可用生日切换为农历展示").performClick()
+
+        composeRule.waitUntil {
+            viewModel.uiState.value.upcoming.single().day.appDisplay == CalendarSystem.LUNAR
+        }
+        composeRule.onNodeWithContentDescription("暂不可用生日切换为农历展示")
+            .assertIsSelected()
+
+        releaseFailure.complete(Unit)
+        composeRule.waitUntil {
+            viewModel.uiState.value.upcoming.single().day.appDisplay == CalendarSystem.SOLAR
+        }
+        composeRule.onNodeWithContentDescription("暂不可用生日切换为新历展示")
+            .assertIsSelected()
+        composeRule.onNodeWithText("切换失败，请重试").assertIsDisplayed()
+    }
+
+    @Test
     fun appShellUsesLightSystemBarIcons() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
@@ -407,4 +488,22 @@ class HomeScreenTest {
         day = day.copy(appDisplay = display),
         displayedDate = DisplayDate(display, text),
     )
+
+    private class ControllableConverter : CalendarConverter {
+        private val delegate = IcuCalendarConverter()
+        var failLunarDisplay = true
+
+        override fun lunarFromSolar(solarDate: LocalDate): LunarDate =
+            delegate.lunarFromSolar(solarDate)
+
+        override fun displayDate(
+            solarDate: LocalDate,
+            calendarSystem: CalendarSystem,
+        ): DisplayDate {
+            if (failLunarDisplay && calendarSystem == CalendarSystem.LUNAR) {
+                throw CalendarConversionException("conversion unavailable")
+            }
+            return delegate.displayDate(solarDate, calendarSystem)
+        }
+    }
 }
