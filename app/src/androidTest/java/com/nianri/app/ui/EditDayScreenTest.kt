@@ -3,12 +3,14 @@ package com.nianri.app.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsSelectable
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -53,6 +55,89 @@ class EditDayScreenTest {
             .assertHasClickAction()
             .performClick()
         compose.onNodeWithText("选择新历日期").assertIsDisplayed()
+    }
+
+    @Test
+    fun dateDialogUsesWheelsInsteadOfStepButtons() {
+        compose.setContent {
+            EditDayScreen(
+                state = state(), widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = {}, onDisplayChange = {},
+                onToggleReminder = {}, onPinnedChange = {}, onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithContentDescription("编辑日期").performClick()
+        compose.onNodeWithTag("month-wheel").assertIsDisplayed()
+        compose.onNodeWithTag("day-wheel").assertIsDisplayed()
+        compose.onAllNodesWithText("−").assertCountEquals(0)
+        compose.onAllNodesWithText("＋").assertCountEquals(0)
+    }
+
+    @Test
+    fun changingToShorterSolarMonthCoercesDayBeforeConfirming() {
+        var month = 0
+        var day = 0
+        compose.setContent {
+            EditDayScreen(
+                state = state().copy(month = 3, day = 31), widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = { month = it }, onDayChange = { day = it },
+                onDisplayChange = {}, onToggleReminder = {}, onPinnedChange = {},
+                onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithContentDescription("编辑日期").performClick()
+        compose.onNodeWithTag("month-wheel-item-4").performClick()
+        compose.onNodeWithText("确定").performClick()
+
+        compose.runOnIdle {
+            assertEquals(4, month)
+            assertEquals(30, day)
+        }
+    }
+
+    @Test
+    fun cancellingWheelEditsDoesNotWriteMonthOrDay() {
+        val months = mutableListOf<Int>()
+        val days = mutableListOf<Int>()
+        compose.setContent {
+            EditDayScreen(
+                state = state(), widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = { months += it }, onDayChange = { days += it },
+                onDisplayChange = {}, onToggleReminder = {}, onPinnedChange = {},
+                onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithContentDescription("编辑日期").performClick()
+        compose.onNodeWithTag("month-wheel-item-9").performClick()
+        compose.onNodeWithContentDescription("取消日期编辑").performClick()
+
+        compose.runOnIdle {
+            assertTrue(months.isEmpty())
+            assertTrue(days.isEmpty())
+        }
+    }
+
+    @Test
+    fun editModeUsesTheSameWheelDialog() {
+        compose.setContent {
+            EditDayScreen(
+                state = state().copy(id = 42), widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = {}, onDisplayChange = {},
+                onToggleReminder = {}, onPinnedChange = {}, onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithText("编辑日子").assertIsDisplayed()
+        compose.onNodeWithContentDescription("编辑日期").performClick()
+        compose.onNodeWithTag("month-wheel").assertIsDisplayed()
+        compose.onNodeWithTag("day-wheel").assertIsDisplayed()
     }
 
     @Test

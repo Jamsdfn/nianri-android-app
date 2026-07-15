@@ -21,7 +21,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -344,36 +343,54 @@ private fun MonthDayDialog(
         title = { Text("选择${calendarName(calendar)}日期") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                NumberSelector("月份", month, 1, 12) { selectedMonth ->
-                    month = selectedMonth
-                    day = day.coerceAtMost(dayMaximum(calendar, selectedMonth))
+                val maximumDay = dayMaximum(calendar, month)
+                LaunchedEffect(maximumDay) {
+                    day = day.coerceAtMost(maximumDay)
                 }
-                NumberSelector("日期", day, 1, dayMaximum(calendar, month)) { day = it }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    WheelPicker(
+                        values = 1..12,
+                        selectedValue = month,
+                        onValueChange = { selectedMonth ->
+                            month = selectedMonth
+                            day = day.coerceAtMost(dayMaximum(calendar, selectedMonth))
+                        },
+                        valueLabel = { "$it 月" },
+                        pickerDescription = "月份选择器",
+                        testTag = "month-wheel",
+                        modifier = Modifier.weight(1f),
+                    )
+                    WheelPicker(
+                        values = 1..maximumDay,
+                        selectedValue = day,
+                        onValueChange = { day = it },
+                        valueLabel = { "$it 日" },
+                        pickerDescription = "日期选择器",
+                        testTag = "day-wheel",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 Text("可选择 2 月 29 日或农历三十，缺少该日期的年份将按规则调整。")
             }
         },
         confirmButton = { TextButton(onClick = { onConfirm(month, day) }) { Text("确定") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.semantics { contentDescription = "取消日期编辑" },
+            ) {
+                Text("取消")
+            }
+        },
     )
 }
 
 private fun dayMaximum(calendar: CalendarSystem, month: Int): Int = when (calendar) {
     CalendarSystem.SOLAR -> Month.of(month).maxLength()
     CalendarSystem.LUNAR -> 30
-}
-
-@Composable
-private fun NumberSelector(label: String, value: Int, minimum: Int, maximum: Int, onChange: (Int) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label)
-        OutlinedButton(onClick = { onChange(if (value == minimum) maximum else value - 1) }) { Text("−") }
-        Text(value.toString(), style = MaterialTheme.typography.titleLarge)
-        OutlinedButton(onClick = { onChange(if (value == maximum) minimum else value + 1) }) { Text("＋") }
-    }
 }
 
 @Composable
