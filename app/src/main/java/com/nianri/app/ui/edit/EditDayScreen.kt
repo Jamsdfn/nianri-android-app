@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -113,9 +116,30 @@ fun EditDayScreen(
                 groupTag = "basis-options",
                 onSelected = onBasisChange,
             )
-            OutlinedButton(onClick = { showDateDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                val prefix = if (state.activePicker == CalendarSystem.SOLAR) "新历" else "农历"
-                Text("$prefix ${state.month} 月 ${state.day} 日")
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val prefix = if (state.activePicker == CalendarSystem.SOLAR) "新历" else "农历"
+                    Text(
+                        text = "$prefix ${state.month} 月 ${state.day} 日",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    TextButton(
+                        onClick = { showDateDialog = true },
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .semantics { contentDescription = "编辑日期" },
+                    ) {
+                        Text("编辑")
+                    }
+                }
             }
             state.dateError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 

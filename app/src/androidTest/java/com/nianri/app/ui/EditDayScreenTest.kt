@@ -1,11 +1,14 @@
 package com.nianri.app.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsSelectable
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -33,6 +36,24 @@ import org.junit.Test
 class EditDayScreenTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun dateTextIsReadOnlyAndOnlyEditButtonOpensPicker() {
+        compose.setContent {
+            EditDayScreen(
+                state = state(), widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = {}, onDisplayChange = {},
+                onToggleReminder = {}, onPinnedChange = {}, onSave = {}, onDelete = {},
+            )
+        }
+
+        compose.onNodeWithText("新历 8 月 6 日").assertHasNoClickAction()
+        compose.onNodeWithContentDescription("编辑日期")
+            .assertHasClickAction()
+            .performClick()
+        compose.onNodeWithText("选择新历日期").assertIsDisplayed()
+    }
 
     @Test
     fun formShowsNumberedSectionsHelperCopyIndependentRemindersAndPreview() {
@@ -141,7 +162,7 @@ class EditDayScreenTest {
             )
         }
 
-        compose.onNodeWithText("新历 12 月 31 日").performClick()
+        compose.onNodeWithContentDescription("编辑日期").performClick()
         compose.onNodeWithText("确定").performClick()
 
         compose.runOnIdle { assertEquals(31, selectedDay) }
@@ -159,7 +180,7 @@ class EditDayScreenTest {
             )
         }
 
-        compose.onNodeWithText("新历 2 月 29 日").performClick()
+        compose.onNodeWithContentDescription("编辑日期").performClick()
         compose.onNodeWithText("确定").performClick()
 
         compose.runOnIdle { assertEquals(29, selectedDay) }
