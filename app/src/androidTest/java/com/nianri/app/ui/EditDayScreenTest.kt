@@ -199,8 +199,36 @@ class EditDayScreenTest {
             )
         }
 
-        compose.onNodeWithText("当天 09:00 · 固定开启").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("提醒时间 09:00 · 固定开启").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("通知与闹钟权限已就绪").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun customReminderTimeIsShownAndRequestsSystemPicker() {
+        var requests = 0
+        var screenState by mutableStateOf(
+            state().copy(reminderTimeMinutes = 8 * 60 + 35),
+        )
+        compose.setContent {
+            EditDayScreen(
+                state = screenState,
+                widgetReferences = 0,
+                onBack = {}, onNameChange = {}, onBasisChange = {},
+                onMonthChange = {}, onDayChange = {}, onDisplayChange = {},
+                onToggleReminder = {},
+                onPinnedChange = {}, onSave = {}, onDelete = {},
+                onPickReminderTime = {
+                    requests += 1
+                    screenState = screenState.copy(reminderTimeMinutes = 20 * 60 + 5)
+                },
+            )
+        }
+
+        compose.onNodeWithText("提醒时间 08:35 · 固定开启")
+            .performScrollTo()
+            .performClick()
+        compose.runOnIdle { assertEquals(1, requests) }
+        compose.onNodeWithText("提醒时间 20:05 · 固定开启").assertIsDisplayed()
     }
 
     @Test

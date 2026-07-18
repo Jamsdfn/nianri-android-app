@@ -48,7 +48,7 @@ class DetailViewModelTest {
         assertEquals("农历正月廿三", state.lunarDate?.text)
         assertEquals("今年不是闰年，本次提前 1 天", state.adjustmentCopy)
         assertEquals(2, state.widgetReferences)
-        assertEquals("提前 14、3 天", state.reminderSummary)
+        assertEquals("当天 09:00；提前 14、3 天", state.reminderSummary)
     }
 
     @Test
@@ -91,7 +91,7 @@ class DetailViewModelTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertEquals("编辑后的纪念日", viewModel.uiState.value.day?.name)
-        assertEquals("未开启提醒", viewModel.uiState.value.reminderSummary)
+        assertEquals("当天 09:00", viewModel.uiState.value.reminderSummary)
     }
 
     @Test
@@ -107,7 +107,7 @@ class DetailViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(42L, state.day?.id)
-        assertEquals("提前 14、3 天", state.reminderSummary)
+        assertEquals("当天 09:00；提前 14、3 天", state.reminderSummary)
         assertEquals(2, state.widgetReferences)
         assertEquals("日期暂不可用", state.error)
     }
@@ -117,6 +117,15 @@ class DetailViewModelTest {
         assertEquals(
             "本月只有二十九天，本次提前 1 天",
             adjustmentCopy(DateAdjustment.SHORT_LUNAR_MONTH),
+        )
+    }
+
+    @Test
+    fun `detail always shows mandatory day reminder at its custom time`() {
+        assertEquals("当天 08:35", reminderSummary(emptySet(), 8 * 60 + 35))
+        assertEquals(
+            "当天 08:35；提前 14、7 天",
+            reminderSummary(setOf(14, 7), 8 * 60 + 35),
         )
     }
 

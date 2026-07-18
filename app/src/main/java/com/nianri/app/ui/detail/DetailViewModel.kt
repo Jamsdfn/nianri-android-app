@@ -99,7 +99,10 @@ class DetailViewModel(
             solarDate = solarDate,
             lunarDate = lunarDate,
             adjustmentCopy = adjustmentCopy(occurrence?.adjustment),
-            reminderSummary = reminderSummary(currentDay.reminders),
+            reminderSummary = reminderSummary(
+                currentDay.reminders,
+                currentDay.reminderTimeMinutes,
+            ),
             widgetReferences = widgetReferences,
             isLoading = false,
             error = errorCopy,
@@ -129,9 +132,18 @@ class DetailViewModel(
 }
 
 
-internal fun reminderSummary(reminders: Set<Int>): String = if (reminders.isEmpty()) {
-    "未开启提醒"
-} else {
+internal fun reminderSummary(
+    reminders: Set<Int>,
+    reminderTimeMinutes: Int,
+): String {
+    val time = "%02d:%02d".format(
+        reminderTimeMinutes / 60,
+        reminderTimeMinutes % 60,
+    )
     val ordered = listOf(14, 7, 3).filter { it in reminders }
-    "提前 ${ordered.joinToString("、")} 天"
+    return if (ordered.isEmpty()) {
+        "当天 $time"
+    } else {
+        "当天 $time；提前 ${ordered.joinToString("、")} 天"
+    }
 }

@@ -72,6 +72,7 @@ fun EditDayScreen(
     onRequestNotificationPermission: () -> Unit = {},
     onRequestExactAlarmPermission: () -> Unit = {},
     onOpenReminderSettings: () -> Unit = {},
+    onPickReminderTime: () -> Unit = {},
 ) {
     var showDateDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -129,11 +130,14 @@ fun EditDayScreen(
             )
 
             Text("提醒", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "当天 09:00 · 固定开启",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            OutlinedButton(onClick = onPickReminderTime, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "提醒时间 %02d:%02d · 固定开启".format(
+                        state.reminderTimeMinutes / 60,
+                        state.reminderTimeMinutes % 60,
+                    ),
+                )
+            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(14, 7, 3).forEach { offset ->
                     FilterChip(

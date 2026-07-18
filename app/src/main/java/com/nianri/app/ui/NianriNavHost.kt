@@ -1,9 +1,11 @@
 package com.nianri.app.ui
 
 import android.Manifest
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -103,6 +105,15 @@ fun NianriNavHost(
                 onDayChange = editViewModel::setDay,
                 onDisplayChange = editViewModel::setDisplay,
                 onToggleReminder = editViewModel::toggleReminder,
+                onPickReminderTime = {
+                    TimePickerDialog(
+                        context,
+                        { _, hour, minute -> editViewModel.setReminderTime(hour, minute) },
+                        state.reminderTimeMinutes / 60,
+                        state.reminderTimeMinutes % 60,
+                        DateFormat.is24HourFormat(context),
+                    ).show()
+                },
                 onPinnedChange = editViewModel::setPinned,
                 onSave = editViewModel::save,
                 onDelete = editViewModel::delete,
