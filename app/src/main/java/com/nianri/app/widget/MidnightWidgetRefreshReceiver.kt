@@ -13,19 +13,36 @@ class MidnightWidgetRefreshReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != MIDNIGHT_WIDGET_REFRESH_ACTION) return
         val pendingResult = goAsync()
-        val application = context.applicationContext as NianriApplication
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                runMidnightWidgetRefresh(
-                    updateWidgets = application.container.widgetUpdater::updateAll,
-                    scheduleNext = application.container.midnightWidgetRefreshScheduler::scheduleNext,
-                    finish = pendingResult::finish,
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                // Application startup, system changes, and WorkManager remain recovery paths.
-            }
+            runMidnightWidgetRefreshBroadcast(
+                refresh = {
+                    val application = context.applicationContext as NianriApplication
+                    runMidnightWidgetRefresh(
+                        updateWidgets = application.container.widgetUpdater::updateAll,
+                        scheduleNext = application.container.midnightWidgetRefreshScheduler::scheduleNext,
+                    )
+                },
+                finish = pendingResult::finish,
+            )
+        }
+    }
+}
+
+internal suspend fun runMidnightWidgetRefreshBroadcast(
+    refresh: suspend () -> Unit,
+    finish: () -> Unit,
+) {
+    try {
+        refresh()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Exception) {
+        // Application startup, system changes, and WorkManager remain recovery paths.
+    } finally {
+        try {
+            finish()
+        } catch (_: Exception) {
+            // The broadcast result can already be finalized by the system.
         }
     }
 }
@@ -33,7 +50,6 @@ class MidnightWidgetRefreshReceiver : BroadcastReceiver() {
 internal suspend fun runMidnightWidgetRefresh(
     updateWidgets: suspend () -> Unit,
     scheduleNext: () -> Unit,
-    finish: () -> Unit,
 ) {
     var failure: Exception? = null
 
@@ -45,12 +61,6 @@ internal suspend fun runMidnightWidgetRefresh(
 
     try {
         scheduleNext()
-    } catch (error: Exception) {
-        if (failure == null) failure = error else failure.addSuppressed(error)
-    }
-
-    try {
-        finish()
     } catch (error: Exception) {
         if (failure == null) failure = error else failure.addSuppressed(error)
     }

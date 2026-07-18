@@ -8,12 +8,31 @@ import org.junit.Test
 
 class MidnightWidgetRefreshReceiverTest {
     @Test
+    fun `dependency resolution failure finishes before refresh begins`() = runBlocking {
+        val calls = mutableListOf<String>()
+
+        runMidnightWidgetRefreshBroadcast(
+            refresh = {
+                calls += "resolve"
+                error("application unavailable")
+            },
+            finish = { calls += "finish" },
+        )
+
+        assertEquals(listOf("resolve", "finish"), calls)
+    }
+
+    @Test
     fun `successful midnight refresh updates then renews then finishes`() = runBlocking {
         val calls = mutableListOf<String>()
 
-        runMidnightWidgetRefresh(
-            updateWidgets = { calls += "widgets" },
-            scheduleNext = { calls += "schedule" },
+        runMidnightWidgetRefreshBroadcast(
+            refresh = {
+                runMidnightWidgetRefresh(
+                    updateWidgets = { calls += "widgets" },
+                    scheduleNext = { calls += "schedule" },
+                )
+            },
             finish = { calls += "finish" },
         )
 
@@ -21,41 +40,41 @@ class MidnightWidgetRefreshReceiverTest {
     }
 
     @Test
-    fun `widget failure still renews and finishes before surfacing the failure`() {
+    fun `widget failure still renews and finishes once`() = runBlocking {
         val calls = mutableListOf<String>()
 
-        assertThrows(IllegalStateException::class.java) {
-            runBlocking {
+        runMidnightWidgetRefreshBroadcast(
+            refresh = {
                 runMidnightWidgetRefresh(
                     updateWidgets = {
                         calls += "widgets"
                         error("database unavailable")
                     },
                     scheduleNext = { calls += "schedule" },
-                    finish = { calls += "finish" },
                 )
-            }
-        }
+            },
+            finish = { calls += "finish" },
+        )
 
         assertEquals(listOf("widgets", "schedule", "finish"), calls)
     }
 
     @Test
-    fun `renewal failure still finishes the pending result`() {
+    fun `renewal failure still finishes once`() = runBlocking {
         val calls = mutableListOf<String>()
 
-        assertThrows(IllegalStateException::class.java) {
-            runBlocking {
+        runMidnightWidgetRefreshBroadcast(
+            refresh = {
                 runMidnightWidgetRefresh(
                     updateWidgets = { calls += "widgets" },
                     scheduleNext = {
                         calls += "schedule"
                         error("alarm unavailable")
                     },
-                    finish = { calls += "finish" },
                 )
-            }
-        }
+            },
+            finish = { calls += "finish" },
+        )
 
         assertEquals(listOf("widgets", "schedule", "finish"), calls)
     }
@@ -66,12 +85,16 @@ class MidnightWidgetRefreshReceiverTest {
 
         assertThrows(CancellationException::class.java) {
             runBlocking {
-                runMidnightWidgetRefresh(
-                    updateWidgets = {
-                        calls += "widgets"
-                        throw CancellationException("stopped")
+                runMidnightWidgetRefreshBroadcast(
+                    refresh = {
+                        runMidnightWidgetRefresh(
+                            updateWidgets = {
+                                calls += "widgets"
+                                throw CancellationException("stopped")
+                            },
+                            scheduleNext = { calls += "schedule" },
+                        )
                     },
-                    scheduleNext = { calls += "schedule" },
                     finish = { calls += "finish" },
                 )
             }

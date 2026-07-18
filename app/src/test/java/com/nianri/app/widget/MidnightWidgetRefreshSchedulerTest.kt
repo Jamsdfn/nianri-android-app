@@ -89,6 +89,7 @@ class MidnightWidgetRefreshSchedulerTest {
         assertEquals(AlarmManager.RTC_WAKEUP, alarm.type)
         assertEquals(Instant.parse("2026-07-18T16:00:00Z").toEpochMilli(), alarm.triggerAtTime)
         assertTrue(alarm.allowWhileIdle)
+        assertTrue(shadowOf(alarm.operation).isImmutable)
         assertEquals(MIDNIGHT_WIDGET_REFRESH_ACTION, intent.action)
         assertEquals(MIDNIGHT_WIDGET_REFRESH_RECEIVER_CLASS, intent.component?.className)
     }
