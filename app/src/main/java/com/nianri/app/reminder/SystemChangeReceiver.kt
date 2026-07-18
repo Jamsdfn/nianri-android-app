@@ -20,6 +20,8 @@ class SystemChangeReceiver : BroadcastReceiver() {
                 runSystemChangeRefresh(
                     rebuildReminders = application.container.reminderScheduler::rebuildAll,
                     updateWidgets = application.container.widgetUpdater::updateAll,
+                    scheduleNextMidnight =
+                        application.container.midnightWidgetRefreshScheduler::scheduleNext,
                 )
             } finally {
                 pendingResult.finish()
@@ -31,20 +33,24 @@ class SystemChangeReceiver : BroadcastReceiver() {
 suspend fun runSystemChangeRefresh(
     rebuildReminders: suspend () -> Unit,
     updateWidgets: suspend () -> Unit,
+    scheduleNextMidnight: () -> Unit = {},
 ) {
     var failure: Exception? = null
-    try {
-        rebuildReminders()
-    } catch (error: CancellationException) {
-        throw error
-    } catch (error: Exception) {
-        failure = error
+
+    suspend fun runSuspendingStep(step: suspend () -> Unit) {
+        try {
+            step()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (failure == null) failure = error else failure?.addSuppressed(error)
+        }
     }
 
+    runSuspendingStep(rebuildReminders)
+    runSuspendingStep(updateWidgets)
     try {
-        updateWidgets()
-    } catch (error: CancellationException) {
-        throw error
+        scheduleNextMidnight()
     } catch (error: Exception) {
         if (failure == null) failure = error else failure.addSuppressed(error)
     }

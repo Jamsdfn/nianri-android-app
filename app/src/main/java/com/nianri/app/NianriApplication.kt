@@ -17,10 +17,15 @@ class NianriApplication : Application() {
             WorkManager.initialize(this, Configuration.Builder().build())
             WorkManager.getInstance(this)
         }
-        workManager.enqueueUniquePeriodicWork(
-            REMINDER_AUDIT_WORK,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            reminderAuditRequest(),
+        initializeBackgroundRefresh(
+            enqueueAudit = {
+                workManager.enqueueUniquePeriodicWork(
+                    REMINDER_AUDIT_WORK,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    reminderAuditRequest(),
+                )
+            },
+            scheduleNextMidnight = container.midnightWidgetRefreshScheduler::scheduleNext,
         )
     }
 
@@ -28,4 +33,12 @@ class NianriApplication : Application() {
         const val REMINDER_AUDIT_WORK = "reminder_daily_audit"
         const val REMINDER_FOREGROUND_AUDIT_WORK = "reminder_foreground_audit"
     }
+}
+
+internal fun initializeBackgroundRefresh(
+    enqueueAudit: () -> Unit,
+    scheduleNextMidnight: () -> Unit,
+) {
+    enqueueAudit()
+    scheduleNextMidnight()
 }

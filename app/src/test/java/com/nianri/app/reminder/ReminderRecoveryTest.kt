@@ -33,15 +33,16 @@ class ReminderRecoveryTest {
     }
 
     @Test
-    fun `system date changes refresh reminders and widget countdowns`() = runBlocking {
+    fun `system date changes refresh reminders widgets and midnight scheduling`() = runBlocking {
         val calls = mutableListOf<String>()
 
         runSystemChangeRefresh(
             rebuildReminders = { calls += "reminders" },
             updateWidgets = { calls += "widgets" },
+            scheduleNextMidnight = { calls += "midnight" },
         )
 
-        assertEquals(listOf("reminders", "widgets"), calls)
+        assertEquals(listOf("reminders", "widgets", "midnight"), calls)
     }
 
     @Test
@@ -56,11 +57,32 @@ class ReminderRecoveryTest {
                         error("alarm unavailable")
                     },
                     updateWidgets = { calls += "widgets" },
+                    scheduleNextMidnight = { calls += "midnight" },
                 )
             }
         }
 
-        assertEquals(listOf("reminders", "widgets"), calls)
+        assertEquals(listOf("reminders", "widgets", "midnight"), calls)
+    }
+
+    @Test
+    fun `midnight renewal runs when widget recovery fails`() {
+        val calls = mutableListOf<String>()
+
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking {
+                runSystemChangeRefresh(
+                    rebuildReminders = { calls += "reminders" },
+                    updateWidgets = {
+                        calls += "widgets"
+                        error("widget host unavailable")
+                    },
+                    scheduleNextMidnight = { calls += "midnight" },
+                )
+            }
+        }
+
+        assertEquals(listOf("reminders", "widgets", "midnight"), calls)
     }
 
     @Test
