@@ -18,7 +18,7 @@ android {
     }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
-    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
 }
 
 ksp {

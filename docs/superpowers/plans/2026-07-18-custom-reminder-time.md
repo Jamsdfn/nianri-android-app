@@ -161,7 +161,7 @@ Room.databaseBuilder(
 Expose exported schemas to `MigrationTestHelper` in `app/build.gradle.kts`:
 
 ```kotlin
-sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
+sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
 ```
 
 Align Room's migration schema parser with its serialization runtime:
