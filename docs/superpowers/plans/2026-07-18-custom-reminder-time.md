@@ -17,6 +17,7 @@
 - The picker follows device 12/24-hour preference; saved UI copy is deterministic `HH:mm`.
 - Day-of stays mandatory and `reminderMask` retains its current meaning.
 - Existing day and widget data must survive Room migration 1→2.
+- Kotlin serialization runtime is aligned to `1.8.1`, matching Room 2.8.4 migration schema parsing.
 
 ---
 
@@ -41,6 +42,7 @@
 - Modify: `app/src/main/java/com/nianri/app/data/local/NianriDatabase.kt`
 - Modify: `app/src/main/java/com/nianri/app/data/ImportantDayRepository.kt`
 - Modify: `app/src/main/java/com/nianri/app/AppContainer.kt`
+- Modify: `app/build.gradle.kts`
 - Modify: `app/src/androidTest/java/com/nianri/app/data/RepositoryTest.kt`
 - Create: `app/src/androidTest/java/com/nianri/app/data/local/NianriDatabaseMigrationTest.kt`
 - Create (KSP output): `app/schemas/com.nianri.app.data.local.NianriDatabase/2.json`
@@ -49,6 +51,7 @@
 - Produces: `DEFAULT_REMINDER_TIME_MINUTES: Int = 540`.
 - Produces: `ImportantDay.reminderTimeMinutes: Int`.
 - Produces: `NianriDatabase.MIGRATION_1_2: Migration`.
+- Produces: androidTest assets containing the exported Room schemas.
 
 - [ ] **Step 1: Write failing Repository tests**
 
@@ -155,6 +158,19 @@ Room.databaseBuilder(
     .build()
 ```
 
+Expose exported schemas to `MigrationTestHelper` in `app/build.gradle.kts`:
+
+```kotlin
+sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
+```
+
+Align Room's migration schema parser with its serialization runtime:
+
+```kotlin
+val serializationBom = platform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.8.1")
+implementation(serializationBom)
+```
+
 - [ ] **Step 5: Write migration preservation test**
 
 Create `NianriDatabaseMigrationTest.kt` with a `MigrationTestHelper`. Insert a complete v1 day row, run `MIGRATION_1_2`, then assert preserved values and the default:
@@ -213,6 +229,7 @@ git add app/src/main/java/com/nianri/app/domain/model/ImportantDay.kt \
   app/src/main/java/com/nianri/app/data/local/NianriDatabase.kt \
   app/src/main/java/com/nianri/app/data/ImportantDayRepository.kt \
   app/src/main/java/com/nianri/app/AppContainer.kt \
+  app/build.gradle.kts \
   app/src/androidTest/java/com/nianri/app/data/RepositoryTest.kt \
   app/src/androidTest/java/com/nianri/app/data/local/NianriDatabaseMigrationTest.kt \
   app/schemas/com.nianri.app.data.local.NianriDatabase/2.json

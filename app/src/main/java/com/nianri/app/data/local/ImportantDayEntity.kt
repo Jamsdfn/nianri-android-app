@@ -1,5 +1,6 @@
 package com.nianri.app.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
@@ -14,6 +15,8 @@ data class ImportantDayEntity(
     val day: Int,
     val appDisplay: CalendarSystem,
     val reminderMask: Int,
+    @ColumnInfo(defaultValue = "540")
+    val reminderTimeMinutes: Int,
     val isPinned: Boolean,
     val createdAt: Long,
     val updatedAt: Long,

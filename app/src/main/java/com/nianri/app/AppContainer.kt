@@ -30,7 +30,9 @@ class AppContainer(context: Context) {
             applicationContext,
             NianriDatabase::class.java,
             "nianri.db",
-        ).build()
+        )
+            .addMigrations(NianriDatabase.MIGRATION_1_2)
+            .build()
     }
     val calendarConverter by lazy { IcuCalendarConverter() }
     val occurrenceCalculator by lazy { DateOccurrenceCalculator(calendarConverter) }

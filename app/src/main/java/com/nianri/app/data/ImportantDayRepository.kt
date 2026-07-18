@@ -56,6 +56,9 @@ class ImportantDayRepository(
         }
         require(day.day in 1..maximumDay) { "Day is invalid for the selected month" }
         require(day.reminders.all { it in REMINDER_BITS }) { "Unsupported reminder offset" }
+        require(day.reminderTimeMinutes in 0 until 24 * 60) {
+            "Reminder time must be between 00:00 and 23:59"
+        }
     }
 
     private fun ImportantDay.toEntity(createdAt: Long, updatedAt: Long) = ImportantDayEntity(
@@ -66,6 +69,7 @@ class ImportantDayRepository(
         day = day,
         appDisplay = appDisplay,
         reminderMask = reminders.fold(0) { mask, offset -> mask or REMINDER_BITS.getValue(offset) },
+        reminderTimeMinutes = reminderTimeMinutes,
         isPinned = isPinned,
         createdAt = createdAt,
         updatedAt = updatedAt,
@@ -81,6 +85,7 @@ class ImportantDayRepository(
         reminders = REMINDER_BITS
             .filterValues { bit -> reminderMask and bit != 0 }
             .keys,
+        reminderTimeMinutes = reminderTimeMinutes,
         isPinned = isPinned,
     )
 

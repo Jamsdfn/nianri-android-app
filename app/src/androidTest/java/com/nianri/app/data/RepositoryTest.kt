@@ -49,10 +49,21 @@ class RepositoryTest {
 
     @Test
     fun insertUpdateAndDeleteRoundTripsDomainValues() = runBlocking {
-        val id = days.save(day(name = "妈妈生日", reminders = setOf(14, 3)))
+        val id = days.save(
+            day(
+                name = "妈妈生日",
+                reminders = setOf(14, 3),
+                reminderTimeMinutes = 8 * 60 + 35,
+            ),
+        )
 
         assertEquals(
-            day(id = id, name = "妈妈生日", reminders = setOf(14, 3)),
+            day(
+                id = id,
+                name = "妈妈生日",
+                reminders = setOf(14, 3),
+                reminderTimeMinutes = 8 * 60 + 35,
+            ),
             days.get(id),
         )
         assertEquals(5, database.importantDayDao().get(id)?.reminderMask)
@@ -339,6 +350,13 @@ class RepositoryTest {
         }
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun saveRejectsInvalidReminderTime() {
+        runBlocking {
+            days.save(day(name = "有效名称", reminderTimeMinutes = 1440))
+        }
+    }
+
     @Test
     fun appDisplayUpdateChangesOnlyDisplayPreference() = runBlocking {
         var timestamp = 100L
@@ -364,6 +382,7 @@ class RepositoryTest {
         day: Int = 18,
         appDisplay: CalendarSystem = CalendarSystem.SOLAR,
         reminders: Set<Int> = setOf(14, 7, 3),
+        reminderTimeMinutes: Int = 9 * 60,
         isPinned: Boolean = false,
     ) = ImportantDay(
         id = id,
@@ -373,6 +392,7 @@ class RepositoryTest {
         day = day,
         appDisplay = appDisplay,
         reminders = reminders,
+        reminderTimeMinutes = reminderTimeMinutes,
         isPinned = isPinned,
     )
 }

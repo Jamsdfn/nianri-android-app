@@ -18,6 +18,7 @@ android {
     }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 }
 
 ksp {
@@ -26,7 +27,9 @@ ksp {
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.06.00")
+    val serializationBom = platform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.8.1")
     implementation(composeBom)
+    implementation(serializationBom)
     androidTestImplementation(composeBom)
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.activity:activity-compose:1.13.0")

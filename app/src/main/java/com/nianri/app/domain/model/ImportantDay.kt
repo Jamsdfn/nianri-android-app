@@ -6,6 +6,8 @@ enum class CalendarSystem { SOLAR, LUNAR }
 
 enum class DateAdjustment { NON_LEAP_YEAR, SHORT_LUNAR_MONTH }
 
+const val DEFAULT_REMINDER_TIME_MINUTES = 9 * 60
+
 data class ImportantDay(
     val id: Long = 0,
     val name: String,
@@ -14,6 +16,7 @@ data class ImportantDay(
     val day: Int,
     val appDisplay: CalendarSystem,
     val reminders: Set<Int> = setOf(14, 7, 3),
+    val reminderTimeMinutes: Int = DEFAULT_REMINDER_TIME_MINUTES,
     val isPinned: Boolean = false,
 )
 
