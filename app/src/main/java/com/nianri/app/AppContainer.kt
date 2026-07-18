@@ -15,6 +15,7 @@ import com.nianri.app.reminder.DayOfReminderLedger
 import com.nianri.app.reminder.ReminderScheduler
 import com.nianri.app.widget.AndroidWidgetInstanceUpdater
 import com.nianri.app.widget.ConfiguredWidgetUpdater
+import com.nianri.app.widget.MidnightWidgetRefreshScheduler
 import com.nianri.app.widget.WidgetInstanceUpdater
 import com.nianri.app.widget.WidgetToggleController
 import java.time.Clock
@@ -53,6 +54,12 @@ class AppContainer(context: Context) {
     }
     val linkedDisplayController by lazy { WidgetToggleController(widgets, widgetInstanceUpdater) }
     val widgetUpdater: WidgetUpdater by lazy { ConfiguredWidgetUpdater(widgets, widgetInstanceUpdater) }
+    val midnightWidgetRefreshScheduler by lazy {
+        MidnightWidgetRefreshScheduler(
+            context = applicationContext,
+            clock = CurrentSystemZoneClock(),
+        )
+    }
     val dayListProjector by lazy {
         DayListProjector(
             days = importantDays,

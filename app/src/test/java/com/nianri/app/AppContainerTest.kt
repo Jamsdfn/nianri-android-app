@@ -3,6 +3,7 @@ package com.nianri.app
 import com.nianri.app.reminder.AndroidReminderScheduler
 import com.nianri.app.widget.AndroidWidgetInstanceUpdater
 import com.nianri.app.widget.ConfiguredWidgetUpdater
+import com.nianri.app.widget.MidnightWidgetRefreshScheduler
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,5 +27,12 @@ class AppContainerTest {
 
         assertTrue(container.widgetInstanceUpdater is AndroidWidgetInstanceUpdater)
         assertTrue(container.widgetUpdater is ConfiguredWidgetUpdater)
+    }
+
+    @Test
+    fun `container binds the midnight widget refresh scheduler`() {
+        val container = AppContainer(RuntimeEnvironment.getApplication())
+
+        assertTrue(container.midnightWidgetRefreshScheduler is MidnightWidgetRefreshScheduler)
     }
 }
