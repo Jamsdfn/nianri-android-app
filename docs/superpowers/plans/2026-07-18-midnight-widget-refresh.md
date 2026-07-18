@@ -136,6 +136,7 @@ package com.nianri.app.widget
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -145,6 +146,8 @@ import java.time.LocalDate
 
 internal const val MIDNIGHT_WIDGET_REFRESH_ACTION =
     "com.nianri.app.action.MIDNIGHT_WIDGET_REFRESH"
+internal const val MIDNIGHT_WIDGET_REFRESH_RECEIVER_CLASS =
+    "com.nianri.app.widget.MidnightWidgetRefreshReceiver"
 private const val MIDNIGHT_WIDGET_REFRESH_REQUEST_CODE = 20_260_718
 
 internal fun nextLocalMidnight(clock: Clock): Instant =
@@ -183,17 +186,15 @@ class MidnightWidgetRefreshScheduler internal constructor(
     private fun operation(): PendingIntent = PendingIntent.getBroadcast(
         applicationContext,
         MIDNIGHT_WIDGET_REFRESH_REQUEST_CODE,
-        Intent(applicationContext, MidnightWidgetRefreshReceiver::class.java)
-            .setAction(MIDNIGHT_WIDGET_REFRESH_ACTION),
+        Intent(MIDNIGHT_WIDGET_REFRESH_ACTION).setComponent(
+            ComponentName(
+                applicationContext.packageName,
+                MIDNIGHT_WIDGET_REFRESH_RECEIVER_CLASS,
+            ),
+        ),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 }
-```
-
-Task 1 temporarily references the receiver that Task 2 will add. To keep each commit buildable, add this minimal receiver declaration at the bottom of the same file and remove it in Task 2 when the real file is created:
-
-```kotlin
-internal class MidnightWidgetRefreshReceiver
 ```
 
 - [ ] **Step 4: Run the calculation tests and verify they pass**
@@ -223,7 +224,7 @@ Append these tests inside `MidnightWidgetRefreshSchedulerTest`:
         assertEquals(Instant.parse("2026-07-18T16:00:00Z").toEpochMilli(), alarm.triggerAtTime)
         assertTrue(alarm.allowWhileIdle)
         assertEquals(MIDNIGHT_WIDGET_REFRESH_ACTION, intent.action)
-        assertEquals(MidnightWidgetRefreshReceiver::class.java.name, intent.component?.className)
+        assertEquals(MIDNIGHT_WIDGET_REFRESH_RECEIVER_CLASS, intent.component?.className)
     }
 
     @Test
@@ -421,7 +422,7 @@ Expected: compilation fails because `runMidnightWidgetRefresh` and the container
 
 - [ ] **Step 3: Implement the receiver and exception-safe orchestration**
 
-Remove the temporary `internal class MidnightWidgetRefreshReceiver` declaration from the scheduler file. Create `MidnightWidgetRefreshReceiver.kt`:
+Create `MidnightWidgetRefreshReceiver.kt`:
 
 ```kotlin
 package com.nianri.app.widget
