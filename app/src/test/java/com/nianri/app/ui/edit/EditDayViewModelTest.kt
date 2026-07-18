@@ -95,6 +95,40 @@ class EditDayViewModelTest {
     }
 
     @Test
+    fun `new day defaults to nine and selected reminder time is saved`() {
+        val viewModel = viewModel()
+
+        assertEquals(9 * 60, viewModel.uiState.value.reminderTimeMinutes)
+        viewModel.setName("妈妈生日")
+        viewModel.setReminderTime(8, 35)
+        viewModel.save()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(8 * 60 + 35, viewModel.uiState.value.reminderTimeMinutes)
+        assertEquals(8 * 60 + 35, saved.single().reminderTimeMinutes)
+    }
+
+    @Test
+    fun `editing loads existing reminder time`() {
+        val viewModel = viewModel(
+            existing = day(id = 42, reminderTimeMinutes = 20 * 60 + 5),
+        )
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(20 * 60 + 5, viewModel.uiState.value.reminderTimeMinutes)
+    }
+
+    @Test
+    fun `invalid reminder picker values do not change state`() {
+        val viewModel = viewModel()
+
+        viewModel.setReminderTime(24, 0)
+        viewModel.setReminderTime(9, 60)
+
+        assertEquals(9 * 60, viewModel.uiState.value.reminderTimeMinutes)
+    }
+
+    @Test
     fun `mandatory day-of reminder keeps permission required when optional reminders are off`() {
         val permissions = FakePermissionController(ReminderPermissionState.WaitingForNotificationPermission)
         val viewModel = viewModel(permissions = permissions)
@@ -217,6 +251,7 @@ class EditDayViewModelTest {
         id: Long = 0,
         basis: CalendarSystem = CalendarSystem.SOLAR,
         display: CalendarSystem = CalendarSystem.SOLAR,
+        reminderTimeMinutes: Int = 9 * 60,
     ) = ImportantDay(
         id = id,
         name = "妈妈生日",
@@ -224,6 +259,7 @@ class EditDayViewModelTest {
         month = 8,
         day = 6,
         appDisplay = display,
+        reminderTimeMinutes = reminderTimeMinutes,
     )
 
     private class PredictableConverter : CalendarConverter {

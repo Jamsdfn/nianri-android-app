@@ -11,6 +11,7 @@ import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.CalendarOperationException
 import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.model.CalendarSystem
+import com.nianri.app.domain.model.DEFAULT_REMINDER_TIME_MINUTES
 import com.nianri.app.domain.model.ImportantDay
 import com.nianri.app.reminder.AndroidReminderPermissionController
 import com.nianri.app.reminder.ReminderPermissionController
@@ -34,6 +35,7 @@ data class EditDayUiState(
     val day: Int = 1,
     val display: CalendarSystem = CalendarSystem.SOLAR,
     val reminders: Set<Int> = setOf(14, 7, 3),
+    val reminderTimeMinutes: Int = DEFAULT_REMINDER_TIME_MINUTES,
     val pinned: Boolean = false,
     val preview: DayCardModel.Ready? = null,
     val nameError: String? = null,
@@ -95,6 +97,11 @@ class EditDayViewModel(
         mutate {
             copy(reminders = if (offset in reminders) reminders - offset else reminders + offset)
         }
+    }
+
+    fun setReminderTime(hour: Int, minute: Int) {
+        if (hour !in 0..23 || minute !in 0..59) return
+        mutate { copy(reminderTimeMinutes = hour * 60 + minute) }
     }
 
     fun setPinned(pinned: Boolean) = mutate { copy(pinned = pinned) }
@@ -214,6 +221,7 @@ class EditDayViewModel(
         day = day,
         appDisplay = display,
         reminders = reminders,
+        reminderTimeMinutes = reminderTimeMinutes,
         isPinned = pinned,
     )
 
@@ -225,6 +233,7 @@ class EditDayViewModel(
         day = day,
         display = appDisplay,
         reminders = reminders,
+        reminderTimeMinutes = reminderTimeMinutes,
         pinned = isPinned,
         activePicker = basis,
         isLoading = false,
