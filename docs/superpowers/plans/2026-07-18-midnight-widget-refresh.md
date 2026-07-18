@@ -30,7 +30,7 @@
 - Create: `app/src/test/java/com/nianri/app/widget/MidnightWidgetRefreshSchedulerTest.kt`
 
 **Interfaces:**
-- Consumes: Android application `Context`, injected `java.time.Clock`, `AlarmManager`, and the receiver class introduced in Task 2.
+- Consumes: Android application `Context`, injected `java.time.Clock`, `AlarmManager`, and the fixed receiver component name implemented in Task 2.
 - Produces: `internal fun nextLocalMidnight(clock: Clock): Instant` and `class MidnightWidgetRefreshScheduler` with `fun scheduleNext()`.
 - Produces: `MIDNIGHT_WIDGET_REFRESH_ACTION`, shared by the scheduler and Task 2 receiver.
 
@@ -298,7 +298,6 @@ git commit -m "feat: schedule silent midnight widget refresh"
 **Files:**
 - Create: `app/src/main/java/com/nianri/app/widget/MidnightWidgetRefreshReceiver.kt`
 - Create: `app/src/test/java/com/nianri/app/widget/MidnightWidgetRefreshReceiverTest.kt`
-- Modify: `app/src/main/java/com/nianri/app/widget/MidnightWidgetRefreshScheduler.kt`
 - Modify: `app/src/main/java/com/nianri/app/AppContainer.kt`
 - Modify: `app/src/test/java/com/nianri/app/AppContainerTest.kt`
 
@@ -511,12 +510,12 @@ Add this lazy singleton immediately after `widgetUpdater`:
 ANDROID_HOME=/Users/alexander/Library/Android/sdk ./gradlew testDebugUnitTest --tests 'com.nianri.app.widget.MidnightWidgetRefreshSchedulerTest' --tests 'com.nianri.app.widget.MidnightWidgetRefreshReceiverTest' --tests 'com.nianri.app.AppContainerTest'
 ```
 
-Expected: eleven tests pass.
+Expected: every selected scheduler, receiver, and container test passes.
 
 - [ ] **Step 5: Commit the receiver and orchestration tests**
 
 ```bash
-git add app/src/main/java/com/nianri/app/widget/MidnightWidgetRefreshScheduler.kt app/src/main/java/com/nianri/app/widget/MidnightWidgetRefreshReceiver.kt app/src/test/java/com/nianri/app/widget/MidnightWidgetRefreshReceiverTest.kt app/src/main/java/com/nianri/app/AppContainer.kt app/src/test/java/com/nianri/app/AppContainerTest.kt
+git add app/src/main/java/com/nianri/app/widget/MidnightWidgetRefreshReceiver.kt app/src/test/java/com/nianri/app/widget/MidnightWidgetRefreshReceiverTest.kt app/src/main/java/com/nianri/app/AppContainer.kt app/src/test/java/com/nianri/app/AppContainerTest.kt
 git commit -m "feat: refresh and renew widgets at midnight"
 ```
 
@@ -882,4 +881,4 @@ git status --short
 git log --oneline -5
 ```
 
-Expected: clean status; the log includes the four implementation commits plus the implementation-plan commit.
+Expected: clean status; the log includes the four implementation commits plus the latest implementation-plan refinement.
