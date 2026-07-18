@@ -49,7 +49,9 @@ class AndroidReminderSchedulerTest {
     }
 
     @Test
-    fun `enabled offsets schedule unique exact alarms at local 09 00`() = runBlocking {
+    fun `enabled offsets schedule unique exact alarms at the day reminder time`() = runBlocking {
+        records = listOf(day(reminderTimeMinutes = 8 * 60 + 35))
+
         val result = scheduler().replace(42)
 
         assertEquals(ReminderScheduleResult.Scheduled(4), result)
@@ -65,7 +67,7 @@ class AndroidReminderSchedulerTest {
                 LocalDate.of(2026, 7, 30),
                 LocalDate.of(2026, 8, 3),
                 LocalDate.of(2026, 8, 6),
-            ).map { it.atTime(9, 0).atZone(zone).toInstant().toEpochMilli() },
+            ).map { it.atTime(8, 35).atZone(zone).toInstant().toEpochMilli() },
             scheduled.map { it.triggerAtTime },
         )
         assertTrue(scheduled.all { it.allowWhileIdle })
@@ -127,6 +129,38 @@ class AndroidReminderSchedulerTest {
     }
 
     @Test
+    fun `same day catch up uses custom reminder time boundary`() = runBlocking {
+        records = listOf(
+            day(
+                month = 7,
+                date = 14,
+                reminders = emptySet(),
+                reminderTimeMinutes = 10 * 60 + 30,
+            ),
+        )
+        val dispatched = mutableListOf<Intent>()
+        val before = Clock.fixed(Instant.parse("2026-07-14T02:29:00Z"), zone)
+
+        assertEquals(ReminderScheduleResult.Scheduled(1), scheduler(before, dispatched::add).replace(42))
+        assertTrue(dispatched.isEmpty())
+        assertEquals(
+            LocalDate.of(2026, 7, 14).atTime(10, 30).atZone(zone).toInstant().toEpochMilli(),
+            alarms.scheduledAlarms.single().triggerAtTime,
+        )
+
+        val atBoundary = Clock.fixed(Instant.parse("2026-07-14T02:30:00Z"), zone)
+        assertEquals(
+            ReminderScheduleResult.Scheduled(0),
+            scheduler(atBoundary, dispatched::add).replace(42),
+        )
+        assertEquals(
+            listOf(0),
+            dispatched.map { it.getIntExtra(ReminderReceiver.EXTRA_OFFSET, -1) },
+        )
+        assertTrue(alarms.scheduledAlarms.isEmpty())
+    }
+
+    @Test
     fun `rebuild all is idempotent`() = runBlocking {
         val scheduler = scheduler()
         scheduler.rebuildAll()
@@ -151,6 +185,7 @@ class AndroidReminderSchedulerTest {
         month: Int = 8,
         date: Int = 6,
         reminders: Set<Int> = setOf(14, 7, 3),
+        reminderTimeMinutes: Int = 9 * 60,
     ) = ImportantDay(
         id = 42,
         name = "妈妈生日",
@@ -159,6 +194,7 @@ class AndroidReminderSchedulerTest {
         day = date,
         appDisplay = CalendarSystem.SOLAR,
         reminders = reminders,
+        reminderTimeMinutes = reminderTimeMinutes,
     )
 
     private data object SolarOnlyConverter : CalendarConverter {

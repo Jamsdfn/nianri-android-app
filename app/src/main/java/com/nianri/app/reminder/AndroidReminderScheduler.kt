@@ -9,6 +9,7 @@ import com.nianri.app.domain.calendar.DateOccurrenceCalculator
 import com.nianri.app.domain.model.ImportantDay
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalTime
 
 class AndroidReminderScheduler(
     context: Context,
@@ -26,9 +27,13 @@ class AndroidReminderScheduler(
         val day = loadDay(dayId) ?: return ReminderScheduleResult.Scheduled(0)
         val today = LocalDate.now(clock)
         val occurrence = calculator.next(day, today)
+        val reminderTime = LocalTime.of(
+            day.reminderTimeMinutes / 60,
+            day.reminderTimeMinutes % 60,
+        )
         val future = (day.reminders + DAY_OF_OFFSET).sortedDescending().mapNotNull { offset ->
             val trigger = occurrence.solarDate.minusDays(offset.toLong())
-                .atTime(9, 0)
+                .atTime(reminderTime)
                 .atZone(clock.zone)
                 .toInstant()
             when {
