@@ -84,6 +84,26 @@ app/build/outputs/apk/debug/app-debug.apk
 ./gradlew connectedDebugAndroidTest
 ```
 
+### 正式发布构建
+
+正式构建需要通过环境变量提供发布签名，密钥文件和密码不要提交到 Git：
+
+```bash
+export NIANRI_RELEASE_STORE_FILE="/absolute/path/to/nianri-release.jks"
+export NIANRI_RELEASE_STORE_PASSWORD="your-store-password"
+export NIANRI_RELEASE_KEY_ALIAS="nianri"
+export NIANRI_RELEASE_KEY_PASSWORD="your-key-password"
+
+./gradlew assembleRelease bundleRelease
+```
+
+签名 APK 和 AAB 分别生成在：
+
+```text
+app/build/outputs/apk/release/app-release.apk
+app/build/outputs/bundle/release/app-release.aab
+```
+
 ## 技术栈
 
 - Kotlin

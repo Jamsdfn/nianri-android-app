@@ -4,6 +4,26 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val releaseStoreFile = providers.environmentVariable("NIANRI_RELEASE_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("NIANRI_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("NIANRI_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("NIANRI_RELEASE_KEY_PASSWORD").orNull
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+val releaseTaskRequested = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+
+check(!releaseTaskRequested || hasReleaseSigning) {
+    "Release signing requires NIANRI_RELEASE_STORE_FILE, " +
+        "NIANRI_RELEASE_STORE_PASSWORD, NIANRI_RELEASE_KEY_ALIAS, and " +
+        "NIANRI_RELEASE_KEY_PASSWORD."
+}
+
 android {
     namespace = "com.nianri.app"
     compileSdk = 36
@@ -19,6 +39,21 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
     sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(requireNotNull(releaseStoreFile))
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
 }
 
 ksp {
