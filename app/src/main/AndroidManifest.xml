@@ -51,6 +51,9 @@
             android:name=".reminder.ReminderReceiver"
             android:exported="false" />
         <receiver
+            android:name=".widget.MidnightWidgetRefreshReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".reminder.SystemChangeReceiver"
             android:exported="false">
             <intent-filter>
