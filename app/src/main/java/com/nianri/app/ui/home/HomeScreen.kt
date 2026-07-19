@@ -29,7 +29,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +55,9 @@ import com.nianri.app.ui.theme.TextMuted
 import com.nianri.app.ui.theme.TextPrimary
 import com.nianri.app.ui.theme.Violet300
 import com.nianri.app.ui.theme.Violet500
+import com.nianri.app.ui.transfer.TransferSheet
+import com.nianri.app.ui.transfer.TransferTab
+import com.nianri.app.ui.transfer.TransferUiState
 
 @Composable
 fun HomeScreen(
@@ -60,8 +67,14 @@ fun HomeScreen(
     onToggleDisplay: (Long) -> Unit = {},
     onDismissCalendarExplanation: () -> Unit = {},
     onDisplayErrorShown: () -> Unit = {},
+    transferState: TransferUiState = TransferUiState(),
+    onSelectTransferTab: (TransferTab) -> Unit = {},
+    onRequestExport: () -> Unit = {},
+    onRequestImport: () -> Unit = {},
+    onTransferMessageShown: () -> Unit = {},
     safeDrawingInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
+    var showTransferSheet by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(state.displayError) {
         val error = state.displayError ?: return@LaunchedEffect
@@ -104,13 +117,21 @@ fun HomeScreen(
                         modifier = Modifier.testTag("home-title"),
                     )
                     if (!state.isLoading) {
-                        TextButton(
-                            onClick = onAdd,
-                            modifier = Modifier
-                                .testTag("home-add")
-                                .semantics { contentDescription = "新建重要日子" },
-                        ) {
-                            Text("＋", fontSize = 26.sp, color = TextPrimary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(
+                                onClick = { showTransferSheet = true },
+                                modifier = Modifier.testTag("home-transfer"),
+                            ) {
+                                Text("迁移", color = TextPrimary)
+                            }
+                            TextButton(
+                                onClick = onAdd,
+                                modifier = Modifier
+                                    .testTag("home-add")
+                                    .semantics { contentDescription = "新建重要日子" },
+                            ) {
+                                Text("＋", fontSize = 26.sp, color = TextPrimary)
+                            }
                         }
                     }
                 }
@@ -187,6 +208,17 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 20.dp),
+        )
+    }
+
+    if (showTransferSheet) {
+        TransferSheet(
+            state = transferState,
+            onDismiss = { showTransferSheet = false },
+            onSelectTab = onSelectTransferTab,
+            onRequestExport = onRequestExport,
+            onRequestImport = onRequestImport,
+            onMessageShown = onTransferMessageShown,
         )
     }
 }

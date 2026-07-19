@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelectable
@@ -18,6 +19,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -40,6 +43,10 @@ import com.nianri.app.domain.model.Occurrence
 import com.nianri.app.ui.home.HomeScreen
 import com.nianri.app.ui.home.HomeUiState
 import com.nianri.app.ui.home.HomeViewModel
+import com.nianri.app.ui.transfer.TransferTab
+import com.nianri.app.ui.transfer.TransferMessage
+import com.nianri.app.ui.transfer.TransferMessageKind
+import com.nianri.app.ui.transfer.TransferUiState
 import java.time.LocalDate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -508,6 +515,118 @@ class HomeScreenTest {
         assertTrue(title.top >= root.top + 40.dp)
         composeRule.onNodeWithTag("home-add").assertIsDisplayed()
         assertEquals(0, composeRule.onAllNodesWithTag("home-fab").fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun migrationEntryAppearsImmediatelyLeftOfAdd() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(dayCount = 2),
+            )
+        }
+
+        val migration = composeRule.onNodeWithTag("home-transfer")
+            .assertIsDisplayed()
+            .getUnclippedBoundsInRoot()
+        val add = composeRule.onNodeWithTag("home-add")
+            .assertIsDisplayed()
+            .getUnclippedBoundsInRoot()
+
+        assertTrue(migration.right <= add.left)
+    }
+
+    @Test
+    fun migrationButtonOpensSheetWithExportSelectedByDefault() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(dayCount = 2),
+            )
+        }
+
+        composeRule.onNodeWithText("迁移").performClick()
+
+        composeRule.onNodeWithText("导出全部配置").assertIsDisplayed()
+        composeRule.onNodeWithTag("transfer-tab-export").assertIsSelected()
+    }
+
+    @Test
+    fun importTabInvokesTheImportPickerCallback() {
+        var imports = 0
+        var selectedTab by mutableStateOf(TransferTab.EXPORT)
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(selectedTab = selectedTab, dayCount = 2),
+                onSelectTransferTab = { selectedTab = it },
+                onRequestImport = { imports++ },
+            )
+        }
+
+        composeRule.onNodeWithText("迁移").performClick()
+        composeRule.onNodeWithTag("transfer-tab-import").performClick()
+        composeRule.onNodeWithText("选择配置并导入").performClick()
+
+        composeRule.runOnIdle { assertEquals(1, imports) }
+    }
+
+    @Test
+    fun emptyExportIsDisabled() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(dayCount = 0),
+            )
+        }
+
+        composeRule.onNodeWithText("迁移").performClick()
+
+        composeRule.onNodeWithText("暂无可导出的纪念日").assertIsDisplayed()
+        composeRule.onNodeWithText("导出全部配置").assertIsNotEnabled()
+    }
+
+    @Test
+    fun processingImportIsDisabled() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(
+                    selectedTab = TransferTab.IMPORT,
+                    dayCount = 1,
+                    isProcessing = true,
+                ),
+            )
+        }
+
+        composeRule.onNodeWithText("迁移").performClick()
+
+        composeRule.onNodeWithText("正在处理…").assertIsDisplayed()
+        composeRule.onNodeWithText("选择配置并导入").assertIsNotEnabled()
+    }
+
+    @Test
+    fun transferResultIsDismissedExplicitly() {
+        var dismissals = 0
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(
+                    dayCount = 1,
+                    message = TransferMessage(
+                        kind = TransferMessageKind.SUCCESS,
+                        text = "已导出 1 个纪念日",
+                    ),
+                ),
+                onTransferMessageShown = { dismissals++ },
+            )
+        }
+
+        composeRule.onNodeWithText("迁移").performClick()
+        composeRule.onNodeWithText("已导出 1 个纪念日").assertIsDisplayed()
+        composeRule.onNodeWithText("知道了").performClick()
+
+        composeRule.runOnIdle { assertEquals(1, dismissals) }
     }
 
     private fun readyDay(
