@@ -75,11 +75,18 @@ fun HomeScreen(
     onImportTextChange: (String) -> Unit = {},
     onPasteFromClipboard: () -> Unit = {},
     onImportPastedText: () -> Unit = {},
+    onImportCompletionConsumed: () -> Unit = {},
     onTransferMessageShown: () -> Unit = {},
     safeDrawingInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
     var showTransferSheet by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(transferState.importCompleted) {
+        if (transferState.importCompleted) {
+            showTransferSheet = false
+            onImportCompletionConsumed()
+        }
+    }
     LaunchedEffect(state.displayError) {
         val error = state.displayError ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(error)

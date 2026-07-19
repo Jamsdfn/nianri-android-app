@@ -696,6 +696,93 @@ class HomeScreenTest {
         composeRule.runOnIdle { assertEquals(1, dismissals) }
     }
 
+    @Test
+    fun successfulImportClosesTransferSheetAndConsumesCompletion() {
+        var transferState by mutableStateOf(
+            TransferUiState(selectedTab = TransferTab.IMPORT),
+        )
+        var consumed = 0
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = transferState,
+                onImportCompletionConsumed = { consumed++ },
+            )
+        }
+        composeRule.onNodeWithText("迁移").performClick()
+
+        composeRule.runOnIdle {
+            transferState = transferState.copy(
+                importCompleted = true,
+                message = TransferMessage(
+                    TransferMessageKind.SUCCESS,
+                    "已导入 1 个纪念日",
+                ),
+            )
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("配置迁移").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, consumed) }
+    }
+
+    @Test
+    fun refreshWarningClosesTransferSheetAndConsumesCompletion() {
+        var transferState by mutableStateOf(
+            TransferUiState(selectedTab = TransferTab.IMPORT),
+        )
+        var consumed = 0
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = transferState,
+                onImportCompletionConsumed = { consumed++ },
+            )
+        }
+        composeRule.onNodeWithText("迁移").performClick()
+
+        composeRule.runOnIdle {
+            transferState = transferState.copy(
+                importCompleted = true,
+                message = TransferMessage(
+                    TransferMessageKind.WARNING,
+                    "已导入，但提醒刷新失败",
+                ),
+            )
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("配置迁移").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, consumed) }
+    }
+
+    @Test
+    fun failedImportKeepsTransferSheetOpen() {
+        var transferState by mutableStateOf(
+            TransferUiState(selectedTab = TransferTab.IMPORT),
+        )
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = transferState,
+            )
+        }
+        composeRule.onNodeWithText("迁移").performClick()
+
+        composeRule.runOnIdle {
+            transferState = transferState.copy(
+                importCompleted = false,
+                message = TransferMessage(
+                    TransferMessageKind.ERROR,
+                    "配置版本暂不支持",
+                ),
+            )
+        }
+
+        composeRule.onNodeWithText("配置迁移").assertIsDisplayed()
+        composeRule.onNodeWithText("配置版本暂不支持").assertIsDisplayed()
+    }
+
     private fun readyDay(
         id: Long,
         name: String,

@@ -127,6 +127,7 @@ fun NianriNavHost(
                     }
                 },
                 onImportPastedText = transferViewModel::importPastedText,
+                onImportCompletionConsumed = transferViewModel::consumeImportCompletion,
                 onTransferMessageShown = transferViewModel::clearMessage,
             )
         }
