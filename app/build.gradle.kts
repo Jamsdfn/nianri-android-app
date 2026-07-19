@@ -65,6 +65,7 @@ dependencies {
     val serializationBom = platform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.8.1")
     implementation(composeBom)
     implementation(serializationBom)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
     androidTestImplementation(composeBom)
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.activity:activity-compose:1.13.0")

@@ -5,7 +5,7 @@ import com.nianri.app.data.local.ImportantDayEntity
 import com.nianri.app.data.local.NianriDatabase
 import com.nianri.app.domain.model.CalendarSystem
 import com.nianri.app.domain.model.ImportantDay
-import java.time.Month
+import com.nianri.app.domain.model.requireValidImportantDay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -21,7 +21,7 @@ class ImportantDayRepository(
     suspend fun get(id: Long): ImportantDay? = dao.get(id)?.toDomain()
 
     suspend fun save(day: ImportantDay): Long {
-        validate(day)
+        requireValidImportantDay(day)
         val timestamp = now()
         val existing = if (day.id == 0L) null else dao.get(day.id)
         val entity = day.toEntity(
@@ -45,20 +45,6 @@ class ImportantDayRepository(
 
     suspend fun delete(id: Long) {
         dao.delete(id)
-    }
-
-    private fun validate(day: ImportantDay) {
-        require(day.name.isNotBlank()) { "Name must not be blank" }
-        require(day.month in 1..12) { "Month must be between 1 and 12" }
-        val maximumDay = when (day.basis) {
-            CalendarSystem.SOLAR -> Month.of(day.month).maxLength()
-            CalendarSystem.LUNAR -> 30
-        }
-        require(day.day in 1..maximumDay) { "Day is invalid for the selected month" }
-        require(day.reminders.all { it in REMINDER_BITS }) { "Unsupported reminder offset" }
-        require(day.reminderTimeMinutes in 0 until 24 * 60) {
-            "Reminder time must be between 00:00 and 23:59"
-        }
     }
 
     private fun ImportantDay.toEntity(createdAt: Long, updatedAt: Long) = ImportantDayEntity(
