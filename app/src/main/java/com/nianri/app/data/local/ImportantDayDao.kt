@@ -1,6 +1,7 @@
 package com.nianri.app.data.local
 
 import androidx.room.Dao
+import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Upsert
 import com.nianri.app.domain.model.CalendarSystem
@@ -13,6 +14,12 @@ interface ImportantDayDao {
 
     @Query("SELECT * FROM important_days WHERE id = :id")
     suspend fun get(id: Long): ImportantDayEntity?
+
+    @Query("SELECT * FROM important_days")
+    suspend fun getAll(): List<ImportantDayEntity>
+
+    @Insert
+    suspend fun insertAll(entities: List<ImportantDayEntity>): List<Long>
 
     @Upsert
     suspend fun upsert(entity: ImportantDayEntity): Long

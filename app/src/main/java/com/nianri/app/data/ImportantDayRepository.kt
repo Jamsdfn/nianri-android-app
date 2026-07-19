@@ -20,6 +20,24 @@ class ImportantDayRepository(
 
     suspend fun get(id: Long): ImportantDay? = dao.get(id)?.toDomain()
 
+    suspend fun getAll(): List<ImportantDay> = dao.getAll().map { it.toDomain() }
+
+    suspend fun importAll(days: List<ImportantDay>): List<Long> {
+        days.forEach(::requireValidImportantDay)
+        require(days.count(ImportantDay::isPinned) <= 1) { "Only one day can be pinned" }
+        val timestamp = now()
+        return database.withTransaction {
+            dao.insertAll(
+                days.map { day ->
+                    day.copy(id = 0).toEntity(
+                        createdAt = timestamp,
+                        updatedAt = timestamp,
+                    )
+                },
+            )
+        }
+    }
+
     suspend fun save(day: ImportantDay): Long {
         requireValidImportantDay(day)
         val timestamp = now()
