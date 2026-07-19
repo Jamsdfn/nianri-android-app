@@ -10,18 +10,25 @@ import com.nianri.app.domain.calendar.CalendarConverter
 import com.nianri.app.domain.calendar.CalendarOperationException
 import com.nianri.app.domain.model.CalendarSystem
 import java.time.DateTimeException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
+private sealed interface CardsLoadState {
+    data object Loading : CardsLoadState
+    data class Loaded(val cards: List<DayCardModel>) : CardsLoadState
+}
+
 data class HomeUiState(
+    val isLoading: Boolean = true,
     val pinned: DayCardModel? = null,
     val upcoming: List<DayCardModel> = emptyList(),
     val showCalendarExplanation: Boolean = true,
@@ -36,15 +43,19 @@ class HomeViewModel(
 ) : ViewModel() {
     private val displayOverrides = MutableStateFlow<Map<Long, CalendarSystem>>(emptyMap())
     private val displayError = MutableStateFlow<String?>(null)
-    private val sourceCards = cards.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Eagerly,
-        initialValue = emptyList(),
-    )
+    private val sourceCards = cards
+        .map<List<DayCardModel>, CardsLoadState> { CardsLoadState.Loaded(it) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = CardsLoadState.Loading,
+        )
 
     init {
         viewModelScope.launch {
-            sourceCards.collect { projectedCards ->
+            sourceCards.collect { loadState ->
+                val projectedCards = (loadState as? CardsLoadState.Loaded)?.cards
+                    ?: return@collect
                 displayOverrides.update { overrides ->
                     overrides.filterNot { (dayId, display) ->
                         projectedCards.any { model ->
@@ -61,13 +72,15 @@ class HomeViewModel(
         displayOverrides,
         uiPreferences.calendarExplanationSeen,
         displayError,
-    ) { projectedCards, overrides, explanationSeen, error ->
+    ) { loadState, overrides, explanationSeen, error ->
+        val projectedCards = (loadState as? CardsLoadState.Loaded)?.cards.orEmpty()
         val cardsWithOverrides = projectedCards.map { model ->
             val display = overrides[model.day.id]
             if (display == null) model else model.withDisplayOverride(display)
         }
         val pinned = cardsWithOverrides.firstOrNull { it.day.isPinned }
         HomeUiState(
+            isLoading = loadState is CardsLoadState.Loading,
             pinned = pinned,
             upcoming = cardsWithOverrides.filterNot { it === pinned },
             showCalendarExplanation = !explanationSeen,
@@ -77,6 +90,7 @@ class HomeViewModel(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = HomeUiState(
+            isLoading = true,
             showCalendarExplanation = !uiPreferences.calendarExplanationSeen.value,
         ),
     )
