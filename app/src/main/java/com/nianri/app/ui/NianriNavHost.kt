@@ -28,6 +28,8 @@ import com.nianri.app.ui.edit.EditDayScreen
 import com.nianri.app.ui.edit.EditDayViewModel
 import com.nianri.app.ui.home.HomeScreen
 import com.nianri.app.ui.home.HomeViewModel
+import com.nianri.app.ui.transfer.TransferViewModel
+import java.io.IOException
 
 @Composable
 fun NianriNavHost(
@@ -54,10 +56,41 @@ fun NianriNavHost(
     }
     NavHost(navController = navController, startDestination = startDestination) {
         composable("home") {
+            val context = LocalContext.current
             val homeViewModel: HomeViewModel = viewModel(
                 factory = HomeViewModel.Factory(container, uiPreferences),
             )
             val state by homeViewModel.uiState.collectAsStateWithLifecycle()
+            val transferViewModel: TransferViewModel = viewModel(
+                factory = TransferViewModel.Factory(container),
+            )
+            val transferState by transferViewModel.uiState.collectAsStateWithLifecycle()
+            val createDocumentLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("application/json"),
+            ) { uri ->
+                if (uri != null) {
+                    transferViewModel.exportTo { text ->
+                        val stream = context.contentResolver.openOutputStream(uri, "wt")
+                            ?: throw IOException("Unable to open output document")
+                        stream.bufferedWriter(Charsets.UTF_8).use { writer ->
+                            writer.write(text)
+                        }
+                    }
+                }
+            }
+            val openDocumentLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument(),
+            ) { uri ->
+                if (uri != null) {
+                    transferViewModel.importFrom {
+                        val stream = context.contentResolver.openInputStream(uri)
+                            ?: throw IOException("Unable to open input document")
+                        stream.bufferedReader(Charsets.UTF_8).use { reader ->
+                            reader.readText()
+                        }
+                    }
+                }
+            }
             HomeScreen(
                 state = state,
                 onAdd = { navController.navigate("edit?dayId=0") },
@@ -65,6 +98,15 @@ fun NianriNavHost(
                 onToggleDisplay = homeViewModel::toggleDisplay,
                 onDismissCalendarExplanation = homeViewModel::dismissCalendarExplanation,
                 onDisplayErrorShown = homeViewModel::clearDisplayError,
+                transferState = transferState,
+                onSelectTransferTab = transferViewModel::selectTab,
+                onRequestExport = {
+                    createDocumentLauncher.launch(transferViewModel.defaultExportFileName())
+                },
+                onRequestImport = {
+                    openDocumentLauncher.launch(arrayOf("application/json", "text/plain"))
+                },
+                onTransferMessageShown = transferViewModel::clearMessage,
             )
         }
         composable(
