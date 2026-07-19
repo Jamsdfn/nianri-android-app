@@ -34,6 +34,7 @@ data class TransferUiState(
     val selectedTab: TransferTab = TransferTab.EXPORT,
     val dayCount: Int = 0,
     val isProcessing: Boolean = false,
+    val importText: String = "",
     val message: TransferMessage? = null,
 )
 
@@ -63,7 +64,9 @@ class TransferViewModel(
 
     fun exportTo(write: suspend (String) -> Unit) {
         val exportedCount = mutableState.value.dayCount
-        startOperation(isImport = false) {
+        startOperation(
+            failureCopy = { error -> errorCopy(error, isImport = false) },
+        ) {
             val text = exportConfiguration()
             write(text)
             TransferMessage(
@@ -73,10 +76,67 @@ class TransferViewModel(
         }
     }
 
+    fun copyToClipboard(copy: suspend (String) -> Unit) {
+        startOperation(
+            failureCopy = { "复制失败，请重试" },
+        ) {
+            copy(exportConfiguration())
+            TransferMessage(
+                kind = TransferMessageKind.SUCCESS,
+                text = "配置已复制到剪贴板",
+            )
+        }
+    }
+
     fun importFrom(read: suspend () -> String) {
-        startOperation(isImport = true) {
+        startOperation(
+            failureCopy = { error -> errorCopy(error, isImport = true) },
+        ) {
             val result = importConfiguration(read())
             result.toMessage()
+        }
+    }
+
+    fun setImportText(text: String) {
+        mutableState.update { it.copy(importText = text) }
+    }
+
+    fun pasteFromClipboard(read: () -> String?) {
+        if (mutableState.value.isProcessing) return
+        try {
+            val text = read()
+            if (text.isNullOrBlank()) {
+                mutableState.update {
+                    it.copy(
+                        message = TransferMessage(
+                            kind = TransferMessageKind.ERROR,
+                            text = "剪贴板中没有可粘贴的配置",
+                        ),
+                    )
+                }
+            } else {
+                mutableState.update { it.copy(importText = text, message = null) }
+            }
+        } catch (_: Exception) {
+            mutableState.update {
+                it.copy(
+                    message = TransferMessage(
+                        kind = TransferMessageKind.ERROR,
+                        text = "读取剪贴板失败，请重试",
+                    ),
+                )
+            }
+        }
+    }
+
+    fun importPastedText() {
+        val text = mutableState.value.importText
+        if (text.isBlank()) return
+        startOperation(
+            failureCopy = { error -> errorCopy(error, isImport = true) },
+            onSuccess = { state -> state.copy(importText = "") },
+        ) {
+            importConfiguration(text).toMessage()
         }
     }
 
@@ -87,23 +147,31 @@ class TransferViewModel(
     fun defaultExportFileName(): String = defaultExportFileName(currentDate())
 
     private fun startOperation(
-        isImport: Boolean,
+        failureCopy: (Exception) -> String,
+        onSuccess: (TransferUiState) -> TransferUiState = { it },
         operation: suspend () -> TransferMessage,
     ) {
         if (mutableState.value.isProcessing) return
         mutableState.update { it.copy(isProcessing = true, message = null) }
         viewModelScope.launch {
-            val message = try {
-                withContext(Dispatchers.IO) { operation() }
+            try {
+                val message = withContext(Dispatchers.IO) { operation() }
+                mutableState.update { state ->
+                    onSuccess(state).copy(isProcessing = false, message = message)
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                TransferMessage(
-                    kind = TransferMessageKind.ERROR,
-                    text = errorCopy(error, isImport),
-                )
+                mutableState.update {
+                    it.copy(
+                        isProcessing = false,
+                        message = TransferMessage(
+                            kind = TransferMessageKind.ERROR,
+                            text = failureCopy(error),
+                        ),
+                    )
+                }
             }
-            mutableState.update { it.copy(isProcessing = false, message = message) }
         }
     }
 

@@ -89,6 +89,75 @@ class TransferViewModelTest {
     }
 
     @Test
+    fun `copy and file export receive the same configuration text with distinct success copy`() {
+        val fileWrites = mutableListOf<String>()
+        val clipboardWrites = mutableListOf<String>()
+        val viewModel = viewModel(days = MutableStateFlow(listOf(day("A"))))
+        waitForState { viewModel.uiState.value.dayCount == 1 }
+
+        viewModel.exportTo { fileWrites += it }
+        waitForFinished(viewModel)
+        assertEquals("已导出 1 个纪念日", viewModel.uiState.value.message?.text)
+
+        viewModel.copyToClipboard { clipboardWrites += it }
+        waitForFinished(viewModel)
+
+        assertEquals(listOf("exported-json"), fileWrites)
+        assertEquals(fileWrites, clipboardWrites)
+        assertEquals("配置已复制到剪贴板", viewModel.uiState.value.message?.text)
+    }
+
+    @Test
+    fun `successful pasted import uses current text then clears it`() {
+        val imported = mutableListOf<String>()
+        val viewModel = viewModel(importedTexts = imported)
+        viewModel.setImportText("pasted-json")
+
+        viewModel.importPastedText()
+        waitForFinished(viewModel)
+
+        assertEquals(listOf("pasted-json"), imported)
+        assertEquals("", viewModel.uiState.value.importText)
+    }
+
+    @Test
+    fun `failed pasted import retains text and exact parse error`() {
+        val viewModel = viewModel(
+            importFailure = TransferFormatException.UnsupportedVersion(2),
+        )
+        viewModel.setImportText("version-two-json")
+
+        viewModel.importPastedText()
+        waitForFinished(viewModel)
+
+        assertEquals("version-two-json", viewModel.uiState.value.importText)
+        assertEquals("配置版本暂不支持", viewModel.uiState.value.message?.text)
+    }
+
+    @Test
+    fun `clipboard paste replaces text only when nonblank`() {
+        val viewModel = viewModel()
+        viewModel.setImportText("keep-me")
+        viewModel.pasteFromClipboard { "new-json" }
+        assertEquals("new-json", viewModel.uiState.value.importText)
+
+        viewModel.pasteFromClipboard { "  " }
+        assertEquals("new-json", viewModel.uiState.value.importText)
+        assertEquals("剪贴板中没有可粘贴的配置", viewModel.uiState.value.message?.text)
+    }
+
+    @Test
+    fun `clipboard read and write failures use clipboard specific copy`() {
+        val viewModel = viewModel()
+        viewModel.pasteFromClipboard { error("read failed") }
+        assertEquals("读取剪贴板失败，请重试", viewModel.uiState.value.message?.text)
+
+        viewModel.copyToClipboard { error("write failed") }
+        waitForFinished(viewModel)
+        assertEquals("复制失败，请重试", viewModel.uiState.value.message?.text)
+    }
+
+    @Test
     fun `a second operation is ignored while processing`() {
         var imports = 0
         val gate = java.util.concurrent.CountDownLatch(1)
@@ -116,10 +185,12 @@ class TransferViewModelTest {
         days: MutableStateFlow<List<ImportantDay>> = MutableStateFlow(emptyList()),
         importResult: TransferImportResult = TransferImportResult(1, 0, false),
         importFailure: Exception? = null,
+        importedTexts: MutableList<String> = mutableListOf(),
     ) = TransferViewModel(
         days = days,
         exportConfiguration = { "exported-json" },
         importConfiguration = {
+            importedTexts += it
             importFailure?.let { throw it }
             importResult
         },
