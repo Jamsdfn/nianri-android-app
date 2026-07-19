@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -102,57 +103,82 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.testTag("home-title"),
                     )
-                    TextButton(
-                        onClick = onAdd,
-                        modifier = Modifier
-                            .testTag("home-add")
-                            .semantics { contentDescription = "新建重要日子" },
-                    ) {
-                        Text("＋", fontSize = 26.sp, color = TextPrimary)
+                    if (!state.isLoading) {
+                        TextButton(
+                            onClick = onAdd,
+                            modifier = Modifier
+                                .testTag("home-add")
+                                .semantics { contentDescription = "新建重要日子" },
+                        ) {
+                            Text("＋", fontSize = 26.sp, color = TextPrimary)
+                        }
                     }
                 }
             }
 
-            if (state.showCalendarExplanation) {
-                item {
-                    CalendarExplanation(onDismissCalendarExplanation)
+            if (!state.isLoading) {
+                if (state.showCalendarExplanation) {
+                    item {
+                        CalendarExplanation(onDismissCalendarExplanation)
+                    }
+                }
+
+                state.pinned?.let { pinned ->
+                    item {
+                        DayCard(
+                            model = pinned,
+                            isHero = true,
+                            onOpen = onOpen,
+                            onToggleDisplay = onToggleDisplay,
+                        )
+                    }
+                }
+
+                if (state.upcoming.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "接下来的日子",
+                            color = TextMuted,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+                        )
+                    }
+                    items(state.upcoming, key = { it.day.id }) { model ->
+                        DayCard(
+                            model = model,
+                            isHero = false,
+                            onOpen = onOpen,
+                            onToggleDisplay = onToggleDisplay,
+                        )
+                    }
+                }
+
+                if (state.pinned == null && state.upcoming.isEmpty()) {
+                    item {
+                        EmptyState(onAdd)
+                    }
                 }
             }
+        }
 
-            state.pinned?.let { pinned ->
-                item {
-                    DayCard(
-                        model = pinned,
-                        isHero = true,
-                        onOpen = onOpen,
-                        onToggleDisplay = onToggleDisplay,
-                    )
-                }
-            }
-
-            if (state.upcoming.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "接下来的日子",
-                        color = TextMuted,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 8.dp, start = 4.dp),
-                    )
-                }
-                items(state.upcoming, key = { it.day.id }) { model ->
-                    DayCard(
-                        model = model,
-                        isHero = false,
-                        onOpen = onOpen,
-                        onToggleDisplay = onToggleDisplay,
-                    )
-                }
-            }
-
-            if (state.pinned == null && state.upcoming.isEmpty()) {
-                item {
-                    EmptyState(onAdd)
-                }
+        if (state.isLoading) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .testTag("home-loading"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.testTag("home-loading-indicator"),
+                    color = Violet300,
+                    strokeWidth = 3.dp,
+                )
+                Text(
+                    text = "正在加载日子…",
+                    color = TextMuted,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
             }
         }
 

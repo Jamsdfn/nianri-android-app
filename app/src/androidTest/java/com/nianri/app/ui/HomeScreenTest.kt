@@ -72,6 +72,7 @@ class HomeScreenTest {
         composeRule.setContent {
             HomeScreen(
                 state = HomeUiState(
+                    isLoading = false,
                     pinned = readyDay(id = 1, name = "妈妈生日", days = 0, pinned = true),
                     upcoming = listOf(readyDay(id = 2, name = "纪念日", days = 8)),
                     showCalendarExplanation = false,
@@ -95,6 +96,7 @@ class HomeScreenTest {
         composeRule.setContent {
             HomeScreen(
                 state = HomeUiState(
+                    isLoading = false,
                     pinned = readyDay(
                         id = 1,
                         name = "妈妈生日",
@@ -117,6 +119,7 @@ class HomeScreenTest {
         composeRule.setContent {
             HomeScreen(
                 state = HomeUiState(
+                    isLoading = false,
                     pinned = readyDay(id = 42, name = "妈妈生日", days = 23, pinned = true),
                     showCalendarExplanation = false,
                 ),
@@ -136,6 +139,7 @@ class HomeScreenTest {
         composeRule.setContent {
             HomeScreen(
                 state = HomeUiState(
+                    isLoading = false,
                     pinned = readyDay(id = 43, name = "妈妈生日", days = 23, pinned = true),
                     showCalendarExplanation = false,
                 ),
@@ -158,11 +162,33 @@ class HomeScreenTest {
     }
 
     @Test
+    fun loadingStateShowsProgressWithoutEmptyOrCreateUi() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(
+                    isLoading = true,
+                    showCalendarExplanation = true,
+                ),
+            )
+        }
+
+        composeRule.onNodeWithTag("home-title").assertIsDisplayed()
+        composeRule.onNodeWithTag("home-loading-indicator").assertIsDisplayed()
+        composeRule.onNodeWithText("正在加载日子…").assertIsDisplayed()
+        composeRule.onNodeWithTag("home-add").assertDoesNotExist()
+        composeRule.onNodeWithText("新建重要日子").assertDoesNotExist()
+        composeRule.onNodeWithText("切换只改变日期怎么显示").assertDoesNotExist()
+    }
+
+    @Test
     fun emptyStateOffersCreateAction() {
         var addCount = 0
         composeRule.setContent {
             HomeScreen(
-                state = HomeUiState(showCalendarExplanation = false),
+                state = HomeUiState(
+                    isLoading = false,
+                    showCalendarExplanation = false,
+                ),
                 onAdd = { addCount++ },
             )
         }
@@ -185,6 +211,7 @@ class HomeScreenTest {
         composeRule.setContent {
             HomeScreen(
                 state = HomeUiState(
+                    isLoading = false,
                     upcoming = listOf(DayCardModel.Unavailable(day)),
                     showCalendarExplanation = false,
                 ),
@@ -211,6 +238,7 @@ class HomeScreenTest {
         composeRule.setContent {
             HomeScreen(
                 state = HomeUiState(
+                    isLoading = false,
                     upcoming = listOf(DayCardModel.Unavailable(day)),
                     showCalendarExplanation = false,
                 ),
@@ -462,7 +490,10 @@ class HomeScreenTest {
     fun homeContentRespectsSafeDrawingInsetsWithoutDuplicateFab() {
         composeRule.setContent {
             HomeScreen(
-                state = HomeUiState(showCalendarExplanation = false),
+                state = HomeUiState(
+                    isLoading = false,
+                    showCalendarExplanation = false,
+                ),
                 safeDrawingInsets = WindowInsets(
                     left = 0.dp,
                     top = 40.dp,
