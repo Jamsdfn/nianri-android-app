@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import com.nianri.app.data.ImportantDayRepository
 import com.nianri.app.data.WidgetRepository
+import com.nianri.app.data.transfer.ConfigurationTransferService
+import com.nianri.app.data.transfer.TransferCodec
 import com.nianri.app.data.local.NianriDatabase
 import com.nianri.app.domain.DayListProjector
 import com.nianri.app.domain.DayMutationCoordinator
@@ -73,6 +75,16 @@ class AppContainer(context: Context) {
             days = importantDays,
             reminders = reminderScheduler,
             widgets = widgetUpdater,
+        )
+    }
+    val transferCodec by lazy { TransferCodec() }
+    val configurationTransferService by lazy {
+        ConfigurationTransferService(
+            days = importantDays,
+            codec = transferCodec,
+            reminders = reminderScheduler,
+            widgets = widgetUpdater,
+            clock = CurrentSystemZoneClock(),
         )
     }
 }

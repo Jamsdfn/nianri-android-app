@@ -1,9 +1,11 @@
 package com.nianri.app
 
 import com.nianri.app.reminder.AndroidReminderScheduler
+import com.nianri.app.data.transfer.ConfigurationTransferService
 import com.nianri.app.widget.AndroidWidgetInstanceUpdater
 import com.nianri.app.widget.ConfiguredWidgetUpdater
 import com.nianri.app.widget.MidnightWidgetRefreshScheduler
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,6 +35,19 @@ class AppContainerTest {
     fun `container binds the midnight widget refresh scheduler`() {
         val container = AppContainer(RuntimeEnvironment.getApplication())
 
-        assertTrue(container.midnightWidgetRefreshScheduler is MidnightWidgetRefreshScheduler)
+        assertEquals(
+            MidnightWidgetRefreshScheduler::class.java,
+            container.midnightWidgetRefreshScheduler.javaClass,
+        )
+    }
+
+    @Test
+    fun `container binds the configuration transfer service`() {
+        val container = AppContainer(RuntimeEnvironment.getApplication())
+
+        assertEquals(
+            ConfigurationTransferService::class.java,
+            container.configurationTransferService.javaClass,
+        )
     }
 }
