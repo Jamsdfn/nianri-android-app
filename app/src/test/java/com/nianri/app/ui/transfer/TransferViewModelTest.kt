@@ -44,6 +44,7 @@ class TransferViewModelTest {
             ),
             viewModel.uiState.value.message,
         )
+        assertTrue(viewModel.uiState.value.importCompleted)
     }
 
     @Test
@@ -58,6 +59,7 @@ class TransferViewModelTest {
             "已导入 3 个纪念日，但提醒刷新失败，请重新打开应用或检查提醒权限",
             viewModel.uiState.value.message?.text,
         )
+        assertTrue(viewModel.uiState.value.importCompleted)
     }
 
     @Test
@@ -72,6 +74,7 @@ class TransferViewModelTest {
         assertFalse(viewModel.uiState.value.isProcessing)
         assertEquals(TransferMessageKind.ERROR, viewModel.uiState.value.message?.kind)
         assertEquals("配置版本暂不支持", viewModel.uiState.value.message?.text)
+        assertFalse(viewModel.uiState.value.importCompleted)
     }
 
     @Test
@@ -118,6 +121,7 @@ class TransferViewModelTest {
 
         assertEquals(listOf("pasted-json"), imported)
         assertEquals("", viewModel.uiState.value.importText)
+        assertTrue(viewModel.uiState.value.importCompleted)
     }
 
     @Test
@@ -132,6 +136,19 @@ class TransferViewModelTest {
 
         assertEquals("version-two-json", viewModel.uiState.value.importText)
         assertEquals("配置版本暂不支持", viewModel.uiState.value.message?.text)
+        assertFalse(viewModel.uiState.value.importCompleted)
+    }
+
+    @Test
+    fun `consuming import completion clears event and hidden message`() {
+        val viewModel = viewModel()
+        viewModel.importFrom { "valid json" }
+        waitForFinished(viewModel)
+
+        viewModel.consumeImportCompletion()
+
+        assertFalse(viewModel.uiState.value.importCompleted)
+        assertEquals(null, viewModel.uiState.value.message)
     }
 
     @Test

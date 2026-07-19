@@ -35,6 +35,7 @@ data class TransferUiState(
     val dayCount: Int = 0,
     val isProcessing: Boolean = false,
     val importText: String = "",
+    val importCompleted: Boolean = false,
     val message: TransferMessage? = null,
 )
 
@@ -91,6 +92,7 @@ class TransferViewModel(
     fun importFrom(read: suspend () -> String) {
         startOperation(
             failureCopy = { error -> errorCopy(error, isImport = true) },
+            onSuccess = { state -> state.copy(importCompleted = true) },
         ) {
             val result = importConfiguration(read())
             result.toMessage()
@@ -134,7 +136,9 @@ class TransferViewModel(
         if (text.isBlank()) return
         startOperation(
             failureCopy = { error -> errorCopy(error, isImport = true) },
-            onSuccess = { state -> state.copy(importText = "") },
+            onSuccess = { state ->
+                state.copy(importText = "", importCompleted = true)
+            },
         ) {
             importConfiguration(text).toMessage()
         }
@@ -142,6 +146,10 @@ class TransferViewModel(
 
     fun clearMessage() {
         mutableState.update { it.copy(message = null) }
+    }
+
+    fun consumeImportCompletion() {
+        mutableState.update { it.copy(importCompleted = false, message = null) }
     }
 
     fun defaultExportFileName(): String = defaultExportFileName(currentDate())
