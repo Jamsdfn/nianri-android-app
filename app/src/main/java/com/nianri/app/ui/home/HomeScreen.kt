@@ -70,7 +70,11 @@ fun HomeScreen(
     transferState: TransferUiState = TransferUiState(),
     onSelectTransferTab: (TransferTab) -> Unit = {},
     onRequestExport: () -> Unit = {},
+    onCopyExport: () -> Unit = {},
     onRequestImport: () -> Unit = {},
+    onImportTextChange: (String) -> Unit = {},
+    onPasteFromClipboard: () -> Unit = {},
+    onImportPastedText: () -> Unit = {},
     onTransferMessageShown: () -> Unit = {},
     safeDrawingInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
@@ -217,7 +221,11 @@ fun HomeScreen(
             onDismiss = { showTransferSheet = false },
             onSelectTab = onSelectTransferTab,
             onRequestExport = onRequestExport,
+            onCopyExport = onCopyExport,
             onRequestImport = onRequestImport,
+            onImportTextChange = onImportTextChange,
+            onPasteFromClipboard = onPasteFromClipboard,
+            onImportPastedText = onImportPastedText,
             onMessageShown = onTransferMessageShown,
         )
     }

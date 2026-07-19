@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -547,8 +548,70 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("迁移").performClick()
 
-        composeRule.onNodeWithText("导出全部配置").assertIsDisplayed()
+        composeRule.onNodeWithText("保存配置到本机").assertIsDisplayed()
         composeRule.onNodeWithTag("transfer-tab-export").assertIsSelected()
+    }
+
+    @Test
+    fun exportTabShowsFileAndClipboardActionsWithPrivacyCopy() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(dayCount = 2),
+            )
+        }
+
+        composeRule.onNodeWithText("迁移").performClick()
+
+        composeRule.onNodeWithText("保存配置到本机").assertIsDisplayed()
+        composeRule.onNodeWithText("复制配置到剪贴板").assertIsDisplayed()
+        composeRule.onNodeWithText("剪贴板配置包含纪念日名称，请注意隐私。").assertIsDisplayed()
+    }
+
+    @Test
+    fun importTabEditsPastesAndImportsText() {
+        var text by mutableStateOf("")
+        val events = mutableListOf<String>()
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(
+                    selectedTab = TransferTab.IMPORT,
+                    importText = text,
+                ),
+                onImportTextChange = { text = it },
+                onPasteFromClipboard = { events += "paste" },
+                onImportPastedText = { events += "import" },
+            )
+        }
+
+        composeRule.onNodeWithText("迁移").performClick()
+        composeRule.onNodeWithText("选择配置文件").assertIsDisplayed()
+        composeRule.onNodeWithTag("transfer-import-text").performTextInput("{json}")
+        composeRule.onNodeWithText("从剪贴板粘贴").performClick()
+        composeRule.onNodeWithText("导入粘贴内容").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals("{json}", text)
+            assertEquals(listOf("paste", "import"), events)
+        }
+    }
+
+    @Test
+    fun emptyTextDisablesPastedImport() {
+        composeRule.setContent {
+            HomeScreen(
+                state = HomeUiState(isLoading = false, showCalendarExplanation = false),
+                transferState = TransferUiState(
+                    selectedTab = TransferTab.IMPORT,
+                    importText = "",
+                ),
+            )
+        }
+
+        composeRule.onNodeWithText("迁移").performClick()
+
+        composeRule.onNodeWithText("导入粘贴内容").assertIsNotEnabled()
     }
 
     @Test
@@ -566,7 +629,7 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("迁移").performClick()
         composeRule.onNodeWithTag("transfer-tab-import").performClick()
-        composeRule.onNodeWithText("选择配置并导入").performClick()
+        composeRule.onNodeWithText("选择配置文件").performClick()
 
         composeRule.runOnIdle { assertEquals(1, imports) }
     }
@@ -583,7 +646,8 @@ class HomeScreenTest {
         composeRule.onNodeWithText("迁移").performClick()
 
         composeRule.onNodeWithText("暂无可导出的纪念日").assertIsDisplayed()
-        composeRule.onNodeWithText("导出全部配置").assertIsNotEnabled()
+        composeRule.onNodeWithText("保存配置到本机").assertIsNotEnabled()
+        composeRule.onNodeWithText("复制配置到剪贴板").assertIsNotEnabled()
     }
 
     @Test
@@ -602,7 +666,10 @@ class HomeScreenTest {
         composeRule.onNodeWithText("迁移").performClick()
 
         composeRule.onNodeWithText("正在处理…").assertIsDisplayed()
-        composeRule.onNodeWithText("选择配置并导入").assertIsNotEnabled()
+        composeRule.onNodeWithText("选择配置文件").assertIsNotEnabled()
+        composeRule.onNodeWithTag("transfer-import-text").assertIsNotEnabled()
+        composeRule.onNodeWithText("从剪贴板粘贴").assertIsNotEnabled()
+        composeRule.onNodeWithText("导入粘贴内容").assertIsNotEnabled()
     }
 
     @Test

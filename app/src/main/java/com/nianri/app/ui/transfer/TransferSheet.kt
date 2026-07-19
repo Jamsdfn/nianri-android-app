@@ -13,6 +13,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -36,7 +38,11 @@ fun TransferSheet(
     onDismiss: () -> Unit,
     onSelectTab: (TransferTab) -> Unit,
     onRequestExport: () -> Unit,
+    onCopyExport: () -> Unit,
     onRequestImport: () -> Unit,
+    onImportTextChange: (String) -> Unit,
+    onPasteFromClipboard: () -> Unit,
+    onImportPastedText: () -> Unit,
     onMessageShown: () -> Unit,
 ) {
     fun dismissSheet() {
@@ -92,11 +98,15 @@ fun TransferSheet(
                 TransferTab.EXPORT -> ExportContent(
                     state = state,
                     onRequestExport = onRequestExport,
+                    onCopyExport = onCopyExport,
                 )
 
                 TransferTab.IMPORT -> ImportContent(
                     state = state,
                     onRequestImport = onRequestImport,
+                    onImportTextChange = onImportTextChange,
+                    onPasteFromClipboard = onPasteFromClipboard,
+                    onImportPastedText = onImportPastedText,
                 )
             }
         }
@@ -107,6 +117,7 @@ fun TransferSheet(
 private fun ExportContent(
     state: TransferUiState,
     onRequestExport: () -> Unit,
+    onCopyExport: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(top = 22.dp)) {
         if (state.dayCount == 0) {
@@ -125,8 +136,21 @@ private fun ExportContent(
             enabled = state.dayCount > 0 && !state.isProcessing,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("导出全部配置")
+            Text("保存配置到本机")
         }
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onCopyExport,
+            enabled = state.dayCount > 0 && !state.isProcessing,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("复制配置到剪贴板")
+        }
+        Text(
+            "剪贴板配置包含纪念日名称，请注意隐私。",
+            color = TextMuted,
+            modifier = Modifier.padding(top = 10.dp),
+        )
     }
 }
 
@@ -134,6 +158,9 @@ private fun ExportContent(
 private fun ImportContent(
     state: TransferUiState,
     onRequestImport: () -> Unit,
+    onImportTextChange: (String) -> Unit,
+    onPasteFromClipboard: () -> Unit,
+    onImportPastedText: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(top = 22.dp)) {
         Text(
@@ -151,7 +178,39 @@ private fun ImportContent(
             enabled = !state.isProcessing,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("选择配置并导入")
+            Text("选择配置文件")
+        }
+        Text(
+            "或粘贴配置",
+            color = TextMuted,
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+        )
+        OutlinedTextField(
+            value = state.importText,
+            onValueChange = onImportTextChange,
+            enabled = !state.isProcessing,
+            placeholder = { Text("粘贴导出的念日配置") },
+            minLines = 5,
+            maxLines = 8,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("transfer-import-text"),
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onPasteFromClipboard,
+            enabled = !state.isProcessing,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("从剪贴板粘贴")
+        }
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = onImportPastedText,
+            enabled = state.importText.isNotBlank() && !state.isProcessing,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("导入粘贴内容")
         }
     }
 }
