@@ -2,6 +2,8 @@ package com.nianri.app.ui
 
 import android.Manifest
 import android.app.TimePickerDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -65,6 +67,9 @@ fun NianriNavHost(
                 factory = TransferViewModel.Factory(container),
             )
             val transferState by transferViewModel.uiState.collectAsStateWithLifecycle()
+            val clipboard = remember(context) {
+                context.getSystemService(ClipboardManager::class.java)
+            }
             val createDocumentLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.CreateDocument("application/json"),
             ) { uri ->
@@ -103,9 +108,25 @@ fun NianriNavHost(
                 onRequestExport = {
                     createDocumentLauncher.launch(transferViewModel.defaultExportFileName())
                 },
+                onCopyExport = {
+                    transferViewModel.copyToClipboard { text ->
+                        clipboard.setPrimaryClip(ClipData.newPlainText("念日配置", text))
+                    }
+                },
                 onRequestImport = {
                     openDocumentLauncher.launch(arrayOf("application/json", "text/plain"))
                 },
+                onImportTextChange = transferViewModel::setImportText,
+                onPasteFromClipboard = {
+                    transferViewModel.pasteFromClipboard {
+                        clipboard.primaryClip
+                            ?.takeIf { it.itemCount > 0 }
+                            ?.getItemAt(0)
+                            ?.coerceToText(context)
+                            ?.toString()
+                    }
+                },
+                onImportPastedText = transferViewModel::importPastedText,
                 onTransferMessageShown = transferViewModel::clearMessage,
             )
         }
