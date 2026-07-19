@@ -46,14 +46,14 @@ class TransferCodec(
     fun decode(text: String): TransferDocument {
         val root = parseRoot(text)
         val format = try {
-            root["format"]?.jsonPrimitive?.content
+            root["format"]?.jsonPrimitive?.takeIf(JsonPrimitive::isString)?.content
         } catch (_: IllegalArgumentException) {
             null
         }
         if (format != FORMAT) throw TransferFormatException.NotNianriConfiguration()
 
         val version = try {
-            root.getValue("version").jsonPrimitive.int
+            root.requiredInt("version")
         } catch (error: Exception) {
             throw TransferFormatException.Corrupt(error)
         }
@@ -62,7 +62,7 @@ class TransferCodec(
         val exportedAt: Instant
         val days: List<ImportantDay>
         try {
-            exportedAt = Instant.parse(root.getValue("exportedAt").jsonPrimitive.content)
+            exportedAt = Instant.parse(root.requiredString("exportedAt"))
             days = root.getValue("days").jsonArray.map(::decodeDay)
         } catch (error: TransferFormatException) {
             throw error
@@ -84,23 +84,43 @@ class TransferCodec(
     private fun decodeDay(element: kotlinx.serialization.json.JsonElement): ImportantDay = try {
         val objectValue = element.jsonObject
         ImportantDay(
-            name = objectValue.getValue("name").jsonPrimitive.content.trim(),
-            basis = CalendarSystem.valueOf(objectValue.getValue("basis").jsonPrimitive.content),
-            month = objectValue.getValue("month").jsonPrimitive.int,
-            day = objectValue.getValue("day").jsonPrimitive.int,
+            name = objectValue.requiredString("name").trim(),
+            basis = CalendarSystem.valueOf(objectValue.requiredString("basis")),
+            month = objectValue.requiredInt("month"),
+            day = objectValue.requiredInt("day"),
             appDisplay = CalendarSystem.valueOf(
-                objectValue.getValue("appDisplay").jsonPrimitive.content,
+                objectValue.requiredString("appDisplay"),
             ),
             reminders = objectValue.getValue("reminders")
                 .jsonArray
-                .mapTo(linkedSetOf()) { it.jsonPrimitive.int },
-            reminderTimeMinutes = objectValue.getValue("reminderTimeMinutes").jsonPrimitive.int,
-            isPinned = objectValue.getValue("isPinned").jsonPrimitive.boolean,
+                .mapTo(linkedSetOf()) { it.jsonPrimitive.strictInt() },
+            reminderTimeMinutes = objectValue.requiredInt("reminderTimeMinutes"),
+            isPinned = objectValue.requiredBoolean("isPinned"),
         ).also(::requireValidImportantDay)
     } catch (error: TransferFormatException) {
         throw error
     } catch (error: Exception) {
         throw TransferFormatException.InvalidDay("Invalid important day", error)
+    }
+
+    private fun JsonObject.requiredString(name: String): String {
+        val primitive = getValue(name).jsonPrimitive
+        require(primitive.isString) { "$name must be a string" }
+        return primitive.content
+    }
+
+    private fun JsonObject.requiredInt(name: String): Int =
+        getValue(name).jsonPrimitive.strictInt()
+
+    private fun JsonPrimitive.strictInt(): Int {
+        require(!isString) { "Expected a number" }
+        return int
+    }
+
+    private fun JsonObject.requiredBoolean(name: String): Boolean {
+        val primitive = getValue(name).jsonPrimitive
+        require(!primitive.isString) { "$name must be a boolean" }
+        return primitive.boolean
     }
 
     private companion object {

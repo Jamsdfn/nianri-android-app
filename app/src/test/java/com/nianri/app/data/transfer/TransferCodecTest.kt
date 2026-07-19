@@ -79,6 +79,49 @@ class TransferCodecTest {
         }
     }
 
+    @Test
+    fun `numeric fields encoded as strings are rejected`() {
+        val json = documentJson(
+            dayJson("A", pinned = false).replace("\"month\":8", "\"month\":\"8\""),
+        )
+
+        assertThrows(TransferFormatException.InvalidDay::class.java) {
+            codec.decode(json)
+        }
+    }
+
+    @Test
+    fun `boolean fields encoded as strings are rejected`() {
+        val json = documentJson(
+            dayJson("A", pinned = false).replace("\"isPinned\":false", "\"isPinned\":\"false\""),
+        )
+
+        assertThrows(TransferFormatException.InvalidDay::class.java) {
+            codec.decode(json)
+        }
+    }
+
+    @Test
+    fun `version encoded as a string is rejected as corrupt`() {
+        val json =
+            """{"format":"nianri-configuration","version":"1","exportedAt":"2026-07-19T09:30:00Z","days":[]}"""
+
+        assertThrows(TransferFormatException.Corrupt::class.java) {
+            codec.decode(json)
+        }
+    }
+
+    @Test
+    fun `reminder offsets encoded as strings are rejected`() {
+        val json = documentJson(
+            dayJson("A", pinned = false).replace("[14,7,3]", "[\"14\",7,3]"),
+        )
+
+        assertThrows(TransferFormatException.InvalidDay::class.java) {
+            codec.decode(json)
+        }
+    }
+
     private fun documentJson(vararg days: String): String =
         """{"format":"nianri-configuration","version":1,"exportedAt":"2026-07-19T09:30:00Z","days":[${days.joinToString()}]}"""
 
